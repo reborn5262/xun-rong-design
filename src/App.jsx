@@ -481,7 +481,6 @@ function Contracts({ items, setItems, projectList = [] }) {
       // 這裡改用傳進來的 projectList
       {key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["", ...projectList]}, 
       {key:"client",label:"客戶"},{key:"amount",label:"合約金額",ph:"NT$"},
-      // 以下省略...
 {key:"signDate",label:"簽約日期",it:"date"},
 {grid:2,children:[{key:"startDate",label:"開工日期",it:"date"},{key:"endDate",label:"完工日期",it:"date"}]},
 {key:"status",label:"狀態",type:"sel",opts:["草稿","已核准","進行中","已完成"],default:"草稿"},
