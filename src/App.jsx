@@ -58,7 +58,7 @@ const NAV_SECTIONS = [
 ]},
 ];
 
-const PROJECT_LIST = ["台北大安區 林宅","信義區 陳宅翻修","中山區 王宅","松山區 商辦空間","內湖 科技公司","公司內部"];
+const PROJECT_LIST = ["公司內部"];
 const SC = { "施工中":"blue","設計中":"yellow","驗收中":"green","報價中":"gray","完工":"green","待審":"yellow","已核准":"green","已拒絕":"red","進行中":"blue","已完成":"green","草稿":"gray","確認中":"blue","已確認":"green","取消":"red" };
 
 function Badge({ color, children }) {
