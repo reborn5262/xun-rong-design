@@ -58,7 +58,7 @@ const NAV_SECTIONS = [
 ]},
 ];
 
-const PROJECT_LIST = ["公司內部"];
+const PROJECT_LIST = ["台北大安區 林宅","信義區 陳宅翻修","中山區 王宅","松山區 商辦空間","內湖 科技公司","公司內部"];
 const SC = { "施工中":"blue","設計中":"yellow","驗收中":"green","報價中":"gray","完工":"green","待審":"yellow","已核准":"green","已拒絕":"red","進行中":"blue","已完成":"green","草稿":"gray","確認中":"blue","已確認":"green","取消":"red" };
 
 function Badge({ color, children }) {
@@ -190,44 +190,71 @@ return (
 );
 }
 
-//接收 projectList，若無資料則預設為空陣列
-function Tasks({ tasks, setTasks, projectList = [] }) { 
-  const [modal, setModal] = useState(false);
-  const [edit, setEdit] = useState(null);
-  const [filter, setFilter] = useState("全部");
-  const blank = {title:"",project:"",priority:"中",due:"",note:""};
-  const [form, setForm] = useState(blank);
-  const open = (item=null)=>{setEdit(item);setForm(item||blank);setModal(true);};
-  const save = ()=>{
-    if(!form.title.trim())return;
-    if(edit)setTasks(p=>p.map(t=>t.id===edit.id?{...t,...form}:t));
-    else setTasks(p=>[{...form,id:Date.now(),done:false},...p]);
-    setModal(false);
-  };
-  const filtered = tasks.filter(t=>filter==="全部"||(filter==="未完成"&&!t.done)||(filter==="已完成"&&t.done));
-  return (
-    <>
-      {/* 中間省略項目列表的 render ... */}
-      
-      {modal&&(
-        <Modal title={edit?"編輯任務":"新增任務"} onClose={()=>setModal(false)}>
-          <div className="space-y-3">
-            <Inp label="任務名稱 *" placeholder="輸入任務名稱" value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/>
-            
-            {/* 這裡原本是 PROJECT_LIST，請改成 projectList */}
-            <Sel label="所屬專案" options={["", ...projectList]} value={form.project} onChange={e=>setForm({...form,project:e.target.value})}/>
-            
-            <div className="grid grid-cols-2 gap-3">
-              <Sel label="優先度" options={["高","中","低"]} value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})}/>
-              <Inp label="截止日期" type="date" value={form.due} onChange={e=>setForm({...form,due:e.target.value})}/>
-            </div>
-            <Txt label="備註" value={form.note} onChange={e=>setForm({...form,note:e.target.value})}/>
-          </div>
-          <Btn onClick={save} label={edit?"儲存變更":"新增任務"}/>
-        </Modal>
-      )}
-    </>
-  );
+function Tasks({ tasks, setTasks }) {
+const [modal, setModal] = useState(false);
+const [edit, setEdit] = useState(null);
+const [filter, setFilter] = useState("全部");
+const blank = {title:"",project:"",priority:"中",due:"",note:""};
+const [form, setForm] = useState(blank);
+const open = (item=null)=>{setEdit(item);setForm(item||blank);setModal(true);};
+const save = ()=>{
+if(!form.title.trim())return;
+if(edit)setTasks(p=>p.map(t=>t.id===edit.id?{...t,...form}:t));
+else setTasks(p=>[{...form,id:Date.now(),done:false},...p]);
+setModal(false);
+};
+const filtered = tasks.filter(t=>filter==="全部"||(filter==="未完成"&&!t.done)||(filter==="已完成"&&t.done));
+return (
+<>
+<div className="space-y-3">
+<div className="flex justify-between items-center">
+<div className="flex gap-1">
+{["全部","未完成","已完成"].map(f=>(
+<button key={f} onClick={()=>setFilter(f)} className={`text-xs px-3 py-1.5 rounded-lg font-medium ${filter===f?"bg-stone-800 text-white":"bg-stone-100 text-stone-500"}`}>{f}</button>
+))}
+</div>
+<button onClick={()=>open()} className="text-xs bg-stone-800 text-white px-3 py-1.5 rounded-lg">＋ 新增</button>
+</div>
+{filtered.length===0&&<div className="text-center text-stone-400 py-12 text-sm">沒有任務</div>}
+{filtered.map(t=>(
+<div key={t.id} className={`bg-white rounded-2xl p-4 shadow-sm border border-stone-100 ${t.done?"opacity-50":""}`}>
+<div className="flex items-start gap-3">
+<button onClick={()=>setTasks(p=>p.map(x=>x.id===t.id?{...x,done:!x.done}:x))} className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${t.done?"bg-stone-800 border-stone-800 text-white":"border-stone-300"}`}>
+{t.done&&<span className="text-xs">✓</span>}
+</button>
+<div className="flex-1 min-w-0">
+<div className={`text-sm font-medium ${t.done?"line-through text-stone-400":"text-stone-800"}`}>{t.title}</div>
+{t.project&&<div className="text-xs text-stone-400 mt-0.5">{t.project}</div>}
+{t.note&&<div className="text-xs text-stone-400 mt-1">{t.note}</div>}
+</div>
+<div className="flex flex-col items-end gap-1">
+<Badge color={t.priority==="高"?"red":t.priority==="中"?"yellow":"green"}>{t.priority}</Badge>
+{t.due&&<span className="text-xs text-stone-400">{t.due}</span>}
+</div>
+</div>
+<div className="flex gap-2 mt-3 pt-3 border-t border-stone-50">
+<button onClick={()=>open(t)} className="flex-1 text-xs text-stone-500 py-1.5 rounded-lg bg-stone-50">✏️ 編輯</button>
+<button onClick={()=>setTasks(p=>p.filter(x=>x.id!==t.id))} className="flex-1 text-xs text-red-400 py-1.5 rounded-lg bg-red-50">🗑 刪除</button>
+</div>
+</div>
+))}
+</div>
+{modal&&(
+<Modal title={edit?"編輯任務":"新增任務"} onClose={()=>setModal(false)}>
+<div className="space-y-3">
+<Inp label="任務名稱 *" placeholder="輸入任務名稱" value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/>
+<Sel label="所屬專案" options={["",...PROJECT_LIST]} value={form.project} onChange={e=>setForm({...form,project:e.target.value})}/>
+<div className="grid grid-cols-2 gap-3">
+<Sel label="優先度" options={["高","中","低"]} value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})}/>
+<Inp label="截止日期" type="date" value={form.due} onChange={e=>setForm({...form,due:e.target.value})}/>
+</div>
+<Txt label="備註" value={form.note} onChange={e=>setForm({...form,note:e.target.value})}/>
+</div>
+<Btn onClick={save} label={edit?"儲存變更":"新增任務"}/>
+</Modal>
+)}
+</>
+);
 }
 
 function Calendar({ tasks }) {
@@ -475,12 +502,11 @@ renderItem={i=>(
 />;
 }
 
-function Contracts({ items, setItems, projectList = [] }) {
-  return <SimpleForm addLabel="新增合約" items={items} setItems={setItems}
-    fields={[
-      // 這裡改用傳進來的 projectList
-      {key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["", ...projectList]}, 
-      {key:"client",label:"客戶"},{key:"amount",label:"合約金額",ph:"NT$"},
+function Contracts({ items, setItems }) {
+return <SimpleForm addLabel="新增合約" items={items} setItems={setItems}
+fields={[
+{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...PROJECT_LIST]},
+{key:"client",label:"客戶"},{key:"amount",label:"合約金額",ph:"NT$"},
 {key:"signDate",label:"簽約日期",it:"date"},
 {grid:2,children:[{key:"startDate",label:"開工日期",it:"date"},{key:"endDate",label:"完工日期",it:"date"}]},
 {key:"status",label:"狀態",type:"sel",opts:["草稿","已核准","進行中","已完成"],default:"草稿"},
@@ -1142,43 +1168,40 @@ window.location.reload();
 const activeItem=NAV_SECTIONS.flatMap(s=>s.items).find(i=>i.id===activeId);
 
 const renderPage=()=>{
-    switch(activeId){
-      case "dashboard": return <Dashboard tasks={tasks} projects={projects} attendance={attendance} setActiveId={setActiveId}/>;
-      // 1. 傳入動態清單
-      case "tasks": return <Tasks tasks={tasks} setTasks={setTasks} projectList={currentProjectList}/>; 
-      case "calendar": return <Calendar tasks={tasks}/>;
-      // 2. 傳入動態清單
-      case "appointments": return <Appointments2 items={appointments} setItems={setAppointments} projectList={currentProjectList}/>;
-      case "inquiries": return <Inquiries items={inquiries} setItems={setInquiries}/>;
-      case "projects": return <Projects items={projects} setItems={setProjects}/>;
-      // 3. 傳入動態清單（以此類推修改下方所有需要專案選單的組件）
-      case "contracts": return <Contracts items={contracts} setItems={setContracts} projectList={currentProjectList}/>;
-      case "quotes": return <Quotes items={quotes} setItems={setQuotes} projectList={currentProjectList}/>;
-      case "inspection": return <Inspection items={inspection} setItems={setInspection} projectList={currentProjectList}/>;
-      case "acceptance": return <Acceptance items={acceptance} setItems={setAcceptance} projectList={currentProjectList}/>;
-      case "pending": return <Pending items={pending} setItems={setPending} projectList={currentProjectList}/>;
-      case "knowledge": return <Knowledge items={knowledge} setItems={setKnowledge}/>;
-      case "lighting": return <Lighting items={lighting} setItems={setLighting} projectList={currentProjectList}/>;
-      case "design": return <Design items={design} setItems={setDesign} projectList={currentProjectList}/>;
-      case "tiles": return <TilesCalc/>;
-      case "ledger": return <Ledger items={ledger} setItems={setLedger} projectList={currentProjectList}/>;
-      case "purchase": return <Purchase items={purchase} setItems={setPurchase} projectList={currentProjectList}/>;
-      case "expense": return <Expense items={expense} setItems={setExpense} projectList={currentProjectList}/>;
-      case "payroll": return <Payroll items={payroll} setItems={setPayroll}/>;
-      case "monthly": return <Monthly items={monthly} setItems={setMonthly}/>;
-      case "forecast": return <Forecast ledger={ledger} projects={projects}/>;
-      case "attendance": return <Attendance items={attendance} setItems={setAttendance}/>;
-      case "leave": return <Leave items={leave} setItems={setLeave}/>;
-      case "overtime": return <Overtime items={overtime} setItems={setOvertime} projectList={currentProjectList}/>;
-      case "materials": return <Materials items={materials} setItems={setMaterials}/>;
-      case "inventory": return <Inventory items={inventory} setItems={setInventory}/>;
-      case "tracking": return <Tracking items={tracking} setItems={setTracking} projectList={currentProjectList}/>;
-      case "profit": return <Profit ledger={ledger} projects={projects}/>;
-      case "losses": return <Losses items={losses} setItems={setLosses} projectList={currentProjectList}/>;
-      case "settings": return <Settings onClearAll={clearAll}/>;
-      default: return <div className="text-center text-stone-400 py-16 text-sm">🔧 功能開發中</div>;
-    }
-  };
+switch(activeId){
+case "dashboard": return <Dashboard tasks={tasks} projects={projects} attendance={attendance} setActiveId={setActiveId}/>;
+case "tasks": return <Tasks tasks={tasks} setTasks={setTasks}/>;
+case "calendar": return <Calendar tasks={tasks}/>;
+case "appointments": return <Appointments2 items={appointments} setItems={setAppointments}/>;
+case "inquiries": return <Inquiries items={inquiries} setItems={setInquiries}/>;
+case "projects": return <Projects items={projects} setItems={setProjects}/>;
+case "contracts": return <Contracts items={contracts} setItems={setContracts}/>;
+case "quotes": return <Quotes items={quotes} setItems={setQuotes}/>;
+case "inspection": return <Inspection items={inspection} setItems={setInspection}/>;
+case "acceptance": return <Acceptance items={acceptance} setItems={setAcceptance}/>;
+case "pending": return <Pending items={pending} setItems={setPending}/>;
+case "knowledge": return <Knowledge items={knowledge} setItems={setKnowledge}/>;
+case "lighting": return <Lighting items={lighting} setItems={setLighting}/>;
+case "design": return <Design items={design} setItems={setDesign}/>;
+case "tiles": return <TilesCalc/>;
+case "ledger": return <Ledger items={ledger} setItems={setLedger}/>;
+case "purchase": return <Purchase items={purchase} setItems={setPurchase}/>;
+case "expense": return <Expense items={expense} setItems={setExpense}/>;
+case "payroll": return <Payroll items={payroll} setItems={setPayroll}/>;
+case "monthly": return <Monthly items={monthly} setItems={setMonthly}/>;
+case "forecast": return <Forecast ledger={ledger} projects={projects}/>;
+case "attendance": return <Attendance items={attendance} setItems={setAttendance}/>;
+case "leave": return <Leave items={leave} setItems={setLeave}/>;
+case "overtime": return <Overtime items={overtime} setItems={setOvertime}/>;
+case "materials": return <Materials items={materials} setItems={setMaterials}/>;
+case "inventory": return <Inventory items={inventory} setItems={setInventory}/>;
+case "tracking": return <Tracking items={tracking} setItems={setTracking}/>;
+case "profit": return <Profit ledger={ledger} projects={projects}/>;
+case "losses": return <Losses items={losses} setItems={setLosses}/>;
+case "settings": return <Settings onClearAll={clearAll}/>;
+default: return <div className="text-center text-stone-400 py-16 text-sm">🔧 功能開發中</div>;
+}
+};
 
 return(
 <div style={{fontFamily:"'Noto Sans TC', sans-serif",maxWidth:430,margin:"0 auto",minHeight:"100vh"}} className="bg-stone-50">
