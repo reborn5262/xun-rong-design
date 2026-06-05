@@ -313,6 +313,7 @@ return(
 }
 function mkPage(fields, addLabel, renderItem) {
 return function Page({ items, setItems }) {
+const __PL__ = useProjects();
 const [modal, setModal] = useState(false);
 const [edit, setEdit] = useState(null);
 const blank = Object.fromEntries(fields.map(f=>[f.key, f.default||""]));
@@ -509,6 +510,7 @@ renderItem={i=>(
 }
 
 function Contracts({ items, setItems }) {
+const __PL__ = useProjects();
 return <SimpleForm addLabel="新增合約" items={items} setItems={setItems}
 fields={[
 {key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...(__PL__)]},
@@ -530,6 +532,7 @@ renderItem={i=>(
 }
 
 function Quotes({ items, setItems }) {
+const __PL__ = useProjects();
 return <SimpleForm addLabel="新增報價" items={items} setItems={setItems}
 fields={[
 {key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...(__PL__)]},
@@ -551,6 +554,7 @@ renderItem={i=>(
 }
 
 function Inspection({ items, setItems }) {
+const __PL__ = useProjects();
 return <SimpleForm addLabel="新增檢核" items={items} setItems={setItems}
 fields={[
 {key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...(__PL__)]},
@@ -572,6 +576,7 @@ renderItem={i=>(
 }
 
 function Acceptance({ items, setItems }) {
+const __PL__ = useProjects();
 return <SimpleForm addLabel="新增驗收" items={items} setItems={setItems}
 fields={[
 {key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...(__PL__)]},
@@ -593,6 +598,7 @@ renderItem={i=>(
 }
 
 function Pending({ items, setItems }) {
+const __PL__ = useProjects();
 return <SimpleForm addLabel="新增待確認" items={items} setItems={setItems}
 fields={[
 {key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...(__PL__)]},
@@ -687,6 +693,7 @@ return(
 }
 
 function Lighting({ items, setItems }) {
+const __PL__ = useProjects();
 return <SimpleForm addLabel="新增燈具" items={items} setItems={setItems}
 fields={[
 {key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...(__PL__)]},
@@ -708,6 +715,7 @@ renderItem={i=>(
 }
 
 function Design({ items, setItems }) {
+const __PL__ = useProjects();
 return <SimpleForm addLabel="新增提案" items={items} setItems={setItems}
 fields={[
 {key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...(__PL__)]},
@@ -777,6 +785,7 @@ renderItem={i=>(
 );
 }
 function Purchase({ items, setItems }) {
+const __PL__ = useProjects();
 return <SimpleForm addLabel="新增採購" items={items} setItems={setItems}
 fields={[
 {key:"item",label:"採購品項 *",req:true},
@@ -798,6 +807,7 @@ renderItem={i=>(
 }
 
 function Expense({ items, setItems }) {
+const __PL__ = useProjects();
 return <SimpleForm addLabel="新增報銷" items={items} setItems={setItems}
 fields={[
 {key:"name",label:"申請人"},
@@ -970,6 +980,7 @@ renderItem={i=>(
 }
 
 function Overtime({ items, setItems }) {
+const __PL__ = useProjects();
 return <SimpleForm addLabel="新增加班" items={items} setItems={setItems}
 fields={[
 {key:"name",label:"員工姓名 *",req:true},
@@ -1034,6 +1045,7 @@ renderItem={i=>(
 }
 
 function Tracking({ items, setItems }) {
+const __PL__ = useProjects();
 return <SimpleForm addLabel="新增備料" items={items} setItems={setItems}
 fields={[
 {key:"material",label:"材料名稱 *",req:true},
@@ -1079,6 +1091,7 @@ return(
 }
 
 function Losses({ items, setItems }) {
+const __PL__ = useProjects();
 const total=items.reduce((s,i)=>s+Number(i.amount||0),0);
 return(
 <>
