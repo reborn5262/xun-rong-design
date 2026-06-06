@@ -16,9 +16,14 @@ const NAV_SECTIONS = [
 { icon: "📅", label: "行事曆", id: "calendar" },
 { icon: "📋", label: "預約總覽", id: "appointments" },
 ]},
+{ label: "客戶與排程", items: [
+{ icon: "👥", label: "客戶管理", id: "clients" },
+{ icon: "🗓", label: "智慧排程", id: "schedule" },
+]},
 { label: "專案管理", items: [
 { icon: "📝", label: "諮詢單管理", id: "inquiries" },
 { icon: "🏠", label: "專案總覽", id: "projects" },
+{ icon: "📸", label: "專案相簿", id: "album" },
 { icon: "📄", label: "合約管理", id: "contracts" },
 { icon: "💰", label: "報價單", id: "quotes" },
 { icon: "🔍", label: "工程檢核", id: "inspection" },
@@ -30,6 +35,7 @@ const NAV_SECTIONS = [
 { icon: "💡", label: "燈光設計", id: "lighting" },
 { icon: "🖥", label: "設計提案", id: "design" },
 { icon: "⊞", label: "磁磚計算", id: "tiles" },
+{ icon: "📄", label: "報表輸出", id: "reports" },
 ]},
 { label: "財務管理", items: [
 { icon: "📒", label: "公司帳本", id: "ledger" },
@@ -1105,26 +1111,147 @@ renderItem={i=>(
 );
 }
 
-function Settings({ onClearAll }) {
+function SettingsSection({ title, icon, children, defaultOpen=false }) {
+const [open, setOpen] = useState(defaultOpen);
+return (
+<div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
+<button onClick={()=>setOpen(!open)} className="w-full flex items-center justify-between px-4 py-3.5">
+<div className="flex items-center gap-2">
+<span className="text-base">{icon}</span>
+<span className="text-sm font-semibold text-stone-700">{title}</span>
+</div>
+<span className={`text-stone-400 text-xs transition-transform ${open?"rotate-180":""}`}>▼</span>
+</button>
+{open && <div className="px-4 pb-4 border-t border-stone-50">{children}</div>}
+</div>
+);
+}
+
+function Settings({ onClearAll, companyInfo, setCompanyInfo, notifSettings, setNotifSettings, menuCustom, setMenuCustom }) {
 const [confirm, setConfirm] = useState(false);
+const [company, setCompany] = useState(companyInfo || {name:"",phone:"",address:"",taxId:"",bank:"",bankAccount:""});
+const [notif, setNotif] = useState(notifSettings || {taskOverdue:true,taskDueToday:true,lowInventory:true,pendingApproval:true,quoteExpiry:true,projectNoUpdate:true});
+
+const saveCompany = () => { setCompanyInfo(company); alert("✅ 公司資料已儲存"); };
+const saveNotif = () => { setNotifSettings(notif); alert("✅ 通知設定已儲存"); };
+
 return(
-<div className="space-y-4">
-<div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100">
-<div className="text-sm font-semibold text-stone-700 mb-3">關於系統</div>
-<div className="text-xs text-stone-400 space-y-1">
-<div>版本：1.0.0</div><div>資料儲存：瀏覽器本機</div><div>所有資料儲存在您的裝置上</div>
+<div className="space-y-3">
+
+{/* Company Info */}
+<SettingsSection title="公司基本資料" icon="🏢" defaultOpen={true}>
+<div className="space-y-3 mt-3">
+<Inp label="公司名稱" placeholder="請輸入公司名稱" value={company.name} onChange={e=>setCompany({...company,name:e.target.value})}/>
+<Inp label="聯絡電話" placeholder="02-XXXX-XXXX" value={company.phone} onChange={e=>setCompany({...company,phone:e.target.value})}/>
+<Inp label="公司地址" placeholder="請輸入地址" value={company.address} onChange={e=>setCompany({...company,address:e.target.value})}/>
+<Inp label="統一編號" placeholder="8位數字" value={company.taxId} onChange={e=>setCompany({...company,taxId:e.target.value})}/>
+<Inp label="銀行名稱" placeholder="例：台灣銀行" value={company.bank} onChange={e=>setCompany({...company,bank:e.target.value})}/>
+<Inp label="銀行帳號" placeholder="帳號" value={company.bankAccount} onChange={e=>setCompany({...company,bankAccount:e.target.value})}/>
+<button onClick={saveCompany} className="w-full bg-stone-800 text-white rounded-xl py-2.5 text-sm font-medium mt-2">儲存公司資料</button>
 </div>
+</SettingsSection>
+
+{/* Notification Settings */}
+<SettingsSection title="通知設定" icon="🔔">
+<div className="space-y-3 mt-3">
+{[
+["taskOverdue","任務逾期提醒"],
+["taskDueToday","任務今日截止提醒"],
+["lowInventory","庫存不足提醒"],
+["pendingApproval","假單/加班待審提醒"],
+["quoteExpiry","報價到期提醒"],
+["projectNoUpdate","專案進度未更新提醒"],
+].map(([key,label])=>(
+<div key={key} className="flex items-center justify-between py-1">
+<span className="text-sm text-stone-700">{label}</span>
+<button onClick={()=>setNotif({...notif,[key]:!notif[key]})}
+className={`w-11 h-6 rounded-full transition-colors relative ${notif[key]?"bg-stone-800":"bg-stone-200"}`}>
+<span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${notif[key]?"left-5":"left-0.5"}`}/>
+</button>
 </div>
-<div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100">
-<div className="text-sm font-semibold text-stone-700 mb-3">資料管理</div>
+))}
+<button onClick={saveNotif} className="w-full bg-stone-800 text-white rounded-xl py-2.5 text-sm font-medium mt-2">儲存通知設定</button>
+</div>
+</SettingsSection>
+
+{/* Menu Label Customization */}
+<SettingsSection title="選單項目名稱編輯" icon="✏️">
+<div className="mt-3 space-y-2">
+<div className="text-xs text-stone-400 mb-3">可自訂每個功能項目的顯示名稱與圖示</div>
+{NAV_SECTIONS.flatMap(s=>s.items).map(item=>{
+const custom = menuCustom[item.id] || {};
+return (
+<div key={item.id} className="flex items-center gap-2">
+<input
+className="w-10 border border-stone-200 rounded-lg px-1 py-1.5 text-center text-sm focus:outline-none"
+placeholder="圖"
+value={custom.icon !== undefined ? custom.icon : item.icon}
+onChange={e=>setMenuCustom(prev=>({...prev,[item.id]:{...( prev[item.id]||{}),icon:e.target.value}}))}
+/>
+<input
+className="flex-1 border border-stone-200 rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:border-stone-400"
+value={custom.label !== undefined ? custom.label : item.label}
+onChange={e=>setMenuCustom(prev=>({...prev,[item.id]:{...(prev[item.id]||{}),label:e.target.value}}))}
+/>
+{(custom.label !== undefined || custom.icon !== undefined) && (
+<button onClick={()=>setMenuCustom(prev=>{const n={...prev};delete n[item.id];return n;})} className="text-xs text-red-400 px-2 py-1.5 rounded-lg bg-red-50 flex-shrink-0">還原</button>
+)}
+</div>
+);
+})}
+<button onClick={()=>alert("✅ 選單名稱已儲存")} className="w-full bg-stone-800 text-white rounded-xl py-2.5 text-sm font-medium mt-2">套用變更</button>
+</div>
+</SettingsSection>
+
+{/* Project Status Options */}
+<SettingsSection title="專案狀態選項" icon="🏠">
+<div className="mt-3 space-y-1">
+{["設計中","報價中","施工中","驗收中","完工"].map(s=>(
+<div key={s} className="flex items-center gap-2 px-3 py-2 bg-stone-50 rounded-xl">
+<span className="text-xs font-medium text-stone-600">{s}</span>
+</div>
+))}
+<div className="text-xs text-stone-400 mt-2">* 狀態選項為系統預設，如需自訂請聯繫開發者</div>
+</div>
+</SettingsSection>
+
+{/* Priority Options */}
+<SettingsSection title="任務優先度" icon="📋">
+<div className="mt-3 space-y-1">
+{[["高","bg-red-100 text-red-700"],["中","bg-yellow-100 text-yellow-700"],["低","bg-green-100 text-green-700"]].map(([p,c])=>(
+<div key={p} className="flex items-center gap-2 px-3 py-2 bg-stone-50 rounded-xl">
+<span className={`text-xs font-medium px-2 py-0.5 rounded-full ${c}`}>{p}</span>
+</div>
+))}
+</div>
+</SettingsSection>
+
+{/* About */}
+<SettingsSection title="關於系統" icon="ℹ️">
+<div className="mt-3 text-xs text-stone-400 space-y-1.5">
+<div className="flex justify-between"><span>版本</span><span>1.0.0</span></div>
+<div className="flex justify-between"><span>資料儲存</span><span>瀏覽器本機</span></div>
+<div className="flex justify-between"><span>建議瀏覽器</span><span>Safari / Chrome</span></div>
+<div className="mt-2 text-stone-300 text-center text-xs">所有資料儲存在您的裝置上</div>
+</div>
+</SettingsSection>
+
+{/* Data Management */}
+<SettingsSection title="資料管理" icon="🗄️">
+<div className="mt-3 space-y-2">
+<div className="bg-stone-50 rounded-xl p-3 text-xs text-stone-400">
+⚠️ 清除資料後無法復原，請謹慎操作。建議先截圖備份重要資料。
+</div>
 <button onClick={()=>setConfirm(true)} className="w-full bg-red-50 text-red-500 rounded-xl py-3 text-sm font-medium">🗑 清除所有資料</button>
 </div>
+</SettingsSection>
+
 {confirm&&(
 <div className="fixed inset-0 z-50 flex items-center justify-center" style={{maxWidth:430,margin:"0 auto"}}>
 <div className="absolute inset-0 bg-black/40" onClick={()=>setConfirm(false)}/>
 <div className="relative bg-white rounded-2xl p-6 mx-4 shadow-2xl">
 <div className="text-base font-semibold text-stone-800 mb-2">確認清除所有資料？</div>
-<div className="text-sm text-stone-400 mb-5">此操作無法復原。</div>
+<div className="text-sm text-stone-400 mb-5">此操作無法復原，所有資料將被永久刪除。</div>
 <div className="flex gap-3">
 <button onClick={()=>setConfirm(false)} className="flex-1 bg-stone-100 text-stone-600 rounded-xl py-2.5 text-sm">取消</button>
 <button onClick={()=>{onClearAll();setConfirm(false);}} className="flex-1 bg-red-500 text-white rounded-xl py-2.5 text-sm">確認清除</button>
@@ -1135,9 +1262,543 @@ return(
 </div>
 );
 }
+
+
+// ─── Clients ────────────────────────────────────────────────────
+function Clients({ items, setItems }) {
+const [modal, setModal] = useState(false);
+const [edit, setEdit] = useState(null);
+const [view, setView] = useState(null);
+const blank = {name:"",phone:"",email:"",address:"",style:"現代風",budget:"",source:"介紹",status:"潛在客戶",birthday:"",note:"",history:""};
+const [form, setForm] = useState(blank);
+const open=(item=null)=>{setEdit(item);setForm(item||blank);setModal(true);};
+const save=()=>{
+if(!form.name.trim())return;
+if(edit)setItems(p=>p.map(i=>i.id===edit.id?{...i,...form}:i));
+else setItems(p=>[{...form,id:Date.now(),createdAt:new Date().toLocaleDateString("zh-TW")},...p]);
+setModal(false);
+};
+const statusColor={
+"潛在客戶":"yellow","進行中":"blue","已完工":"green","長期客戶":"green","不合適":"gray"
+};
+return(
+<>
+<div className="grid grid-cols-3 gap-2 mb-3">
+{[["全部客戶",items.length,"stone"],["進行中",items.filter(i=>i.status==="進行中").length,"blue"],["已完工",items.filter(i=>i.status==="已完工").length,"green"]].map(([l,v,c])=>(
+<div key={l} className="bg-white rounded-2xl p-3 text-center border border-stone-100 shadow-sm">
+<div className={`text-lg font-bold ${c==="blue"?"text-blue-500":c==="green"?"text-emerald-500":"text-stone-700"}`}>{v}</div>
+<div className="text-xs text-stone-400">{l}</div>
+</div>
+))}
+</div>
+<ListPage items={items} onAdd={()=>open()} onEdit={open} onDelete={id=>setItems(p=>p.filter(i=>i.id!==id))} addLabel="新增客戶"
+renderItem={i=>(
+<>
+<div className="flex justify-between items-start mb-1">
+<div className="font-semibold text-stone-800 text-sm">{i.name}</div>
+<Badge color={statusColor[i.status]||"gray"}>{i.status}</Badge>
+</div>
+<div className="text-xs text-stone-400">{i.phone}{i.email?` · ${i.email}`:""}</div>
+<div className="text-xs text-stone-400 mt-0.5">{i.style}{i.budget?` · 預算 ${i.budget}`:""}</div>
+{i.note&&<div className="text-xs text-stone-500 mt-1 line-clamp-1">{i.note}</div>}
+<button onClick={e=>{e.stopPropagation();setView(i);}} className="text-xs text-blue-500 mt-1">查看詳情 →</button>
+</>
+)}
+/>
+{modal&&<Modal title={edit?"編輯客戶":"新增客戶"} onClose={()=>setModal(false)}>
+<div className="space-y-3">
+<Inp label="客戶姓名 *" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>
+<div className="grid grid-cols-2 gap-3">
+<Inp label="聯絡電話" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})}/>
+<Inp label="Email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/>
+</div>
+<Inp label="地址" value={form.address} onChange={e=>setForm({...form,address:e.target.value})}/>
+<div className="grid grid-cols-2 gap-3">
+<Sel label="偏好風格" options={["現代風","北歐風","工業風","日式風","古典風","混搭風","其他"]} value={form.style} onChange={e=>setForm({...form,style:e.target.value})}/>
+<Inp label="預算範圍" placeholder="NT$" value={form.budget} onChange={e=>setForm({...form,budget:e.target.value})}/>
+</div>
+<div className="grid grid-cols-2 gap-3">
+<Sel label="客戶來源" options={["介紹","網路","廣告","展覽","其他"]} value={form.source} onChange={e=>setForm({...form,source:e.target.value})}/>
+<Sel label="狀態" options={["潛在客戶","進行中","已完工","長期客戶","不合適"]} value={form.status} onChange={e=>setForm({...form,status:e.target.value})}/>
+</div>
+<Inp label="生日" type="date" value={form.birthday} onChange={e=>setForm({...form,birthday:e.target.value})}/>
+<Txt label="溝通紀錄" placeholder="記錄每次溝通重點" value={form.history} onChange={e=>setForm({...form,history:e.target.value})}/>
+<Txt label="備註" value={form.note} onChange={e=>setForm({...form,note:e.target.value})}/>
+</div>
+<Btn onClick={save}/>
+</Modal>}
+{view&&<Modal title={view.name} onClose={()=>setView(null)}>
+<div className="space-y-3">
+<div className="flex justify-between items-center">
+<Badge color={statusColor[view.status]||"gray"}>{view.status}</Badge>
+<span className="text-xs text-stone-400">{view.createdAt} 建立</span>
+</div>
+{[["📞 電話",view.phone],["📧 Email",view.email],["📍 地址",view.address],["🎨 風格",view.style],["💰 預算",view.budget],["📣 來源",view.source],["🎂 生日",view.birthday]].filter(([,v])=>v).map(([l,v])=>(
+<div key={l} className="flex gap-2 text-sm"><span className="text-stone-400 flex-shrink-0">{l}</span><span className="text-stone-700">{v}</span></div>
+))}
+{view.history&&<><div className="text-xs text-stone-400 mt-2 font-medium">溝通紀錄</div><div className="text-sm text-stone-700 whitespace-pre-wrap bg-stone-50 rounded-xl p-3">{view.history}</div></>}
+{view.note&&<><div className="text-xs text-stone-400 font-medium">備註</div><div className="text-sm text-stone-700">{view.note}</div></>}
+<div className="flex gap-2 mt-2">
+<button onClick={()=>{setView(null);open(view);}} className="flex-1 bg-stone-800 text-white rounded-xl py-2.5 text-sm">✏️ 編輯</button>
+</div>
+</div>
+</Modal>}
+</>
+);
+}
+
+// ─── Schedule ───────────────────────────────────────────────────
+function Schedule({ items, setItems, projects }) {
+const [modal, setModal] = useState(false);
+const [edit, setEdit] = useState(null);
+const blank = {title:"",project:"",worker:"",type:"施工",startDate:"",endDate:"",startTime:"",endTime:"",color:"blue",note:""};
+const [form, setForm] = useState(blank);
+const [viewMonth, setViewMonth] = useState(new Date().getMonth());
+const [viewYear, setViewYear] = useState(new Date().getFullYear());
+const open=(item=null)=>{setEdit(item);setForm(item||blank);setModal(true);};
+const save=()=>{
+if(!form.title.trim())return;
+if(edit)setItems(p=>p.map(i=>i.id===edit.id?{...i,...form}:i));
+else setItems(p=>[{...form,id:Date.now()},...p]);
+setModal(false);
+};
+
+const today=new Date();
+const firstDay=new Date(viewYear,viewMonth,1).getDay();
+const daysInMonth=new Date(viewYear,viewMonth+1,0).getDate();
+const mNames=["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+
+const getEventsForDay=(day)=>{
+const dateStr=`${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+return items.filter(i=>i.startDate<=dateStr&&i.endDate>=dateStr);
+};
+
+const typeColor={施工:"bg-blue-200",設計:"bg-purple-200",驗收:"bg-green-200",會議:"bg-yellow-200",其他:"bg-stone-200"};
+
+// Conflict detection
+const conflicts=[];
+for(let i=0;i<items.length;i++){
+for(let j=i+1;j<items.length;j++){
+const a=items[i],b=items[j];
+if(a.worker&&b.worker&&a.worker===b.worker&&a.startDate<=b.endDate&&b.startDate<=a.endDate){
+conflicts.push({a:a.title,b:b.title,worker:a.worker});
+}
+}
+}
+
+return(
+<div className="space-y-3">
+{conflicts.length>0&&(
+<div className="bg-red-50 border border-red-200 rounded-2xl p-3">
+<div className="text-xs text-red-600 font-medium mb-1">⚠️ 排程衝突</div>
+{conflicts.map((c,i)=><div key={i} className="text-xs text-red-500">「{c.worker}」：{c.a} 與 {c.b} 時間重疊</div>)}
+</div>
+)}
+<div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100">
+<div className="flex justify-between items-center mb-4">
+<button onClick={()=>{if(viewMonth===0){setViewMonth(11);setViewYear(y=>y-1)}else setViewMonth(m=>m-1);}} className="w-8 h-8 flex items-center justify-center text-stone-400 text-xl">‹</button>
+<span className="text-sm font-semibold">{viewYear}年 {mNames[viewMonth]}</span>
+<button onClick={()=>{if(viewMonth===11){setViewMonth(0);setViewYear(y=>y+1)}else setViewMonth(m=>m+1);}} className="w-8 h-8 flex items-center justify-center text-stone-400 text-xl">›</button>
+</div>
+<div className="grid grid-cols-7 text-center mb-1">
+{["日","一","二","三","四","五","六"].map(d=><div key={d} className="text-xs text-stone-400">{d}</div>)}
+</div>
+<div className="grid grid-cols-7 gap-y-1">
+{Array(firstDay).fill(null).map((_,i)=><div key={`e${i}`}/>)}
+{Array(daysInMonth).fill(null).map((_,i)=>{
+const day=i+1;
+const isToday=day===today.getDate()&&viewMonth===today.getMonth()&&viewYear===today.getFullYear();
+const evts=getEventsForDay(day);
+return(
+<div key={day} className="flex flex-col items-center">
+<div className={`w-7 h-7 flex items-center justify-center rounded-full text-xs ${isToday?"bg-stone-800 text-white font-bold":""}`}>{day}</div>
+{evts.slice(0,2).map(e=><div key={e.id} className={`w-full text-[9px] rounded px-0.5 truncate mt-0.5 ${typeColor[e.type]||"bg-stone-200"}`}>{e.title}</div>)}
+{evts.length>2&&<div className="text-[9px] text-stone-400">+{evts.length-2}</div>}
+</div>
+);
+})}
+</div>
+</div>
+<div className="flex justify-between items-center">
+<span className="text-sm text-stone-400">共 {items.length} 筆排程</span>
+<button onClick={()=>open()} className="text-xs bg-stone-800 text-white px-3 py-1.5 rounded-lg">＋ 新增排程</button>
+</div>
+{items.sort((a,b)=>a.startDate>b.startDate?1:-1).slice(0,10).map(i=>(
+<div key={i.id} className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100">
+<div className="flex justify-between items-start mb-1">
+<div className="font-semibold text-stone-800 text-sm">{i.title}</div>
+<span className={`text-xs px-2 py-0.5 rounded-full ${typeColor[i.type]||"bg-stone-100"}`}>{i.type}</span>
+</div>
+<div className="text-xs text-stone-400">{i.project}{i.worker?` · 負責：${i.worker}`:""}</div>
+<div className="text-xs text-stone-500 mt-1">📅 {i.startDate}{i.endDate!==i.startDate?` ～ ${i.endDate}`:""} {i.startTime}{i.endTime?`～${i.endTime}`:""}</div>
+<div className="flex gap-2 mt-3 pt-3 border-t border-stone-50">
+<button onClick={()=>open(i)} className="flex-1 text-xs text-stone-500 py-1.5 rounded-lg bg-stone-50">✏️ 編輯</button>
+<button onClick={()=>setItems(p=>p.filter(x=>x.id!==i.id))} className="flex-1 text-xs text-red-400 py-1.5 rounded-lg bg-red-50">🗑 刪除</button>
+</div>
+</div>
+))}
+{modal&&<Modal title={edit?"編輯排程":"新增排程"} onClose={()=>setModal(false)}>
+<div className="space-y-3">
+<Inp label="標題 *" value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/>
+<Sel label="所屬專案" options={["",...getProjectList()]} value={form.project} onChange={e=>setForm({...form,project:e.target.value})}/>
+<div className="grid grid-cols-2 gap-3">
+<Sel label="類型" options={["施工","設計","驗收","會議","其他"]} value={form.type} onChange={e=>setForm({...form,type:e.target.value})}/>
+<Inp label="負責人/師傅" value={form.worker} onChange={e=>setForm({...form,worker:e.target.value})}/>
+</div>
+<div className="grid grid-cols-2 gap-3">
+<Inp label="開始日期" type="date" value={form.startDate} onChange={e=>setForm({...form,startDate:e.target.value})}/>
+<Inp label="結束日期" type="date" value={form.endDate} onChange={e=>setForm({...form,endDate:e.target.value})}/>
+</div>
+<div className="grid grid-cols-2 gap-3">
+<Inp label="開始時間" type="time" value={form.startTime} onChange={e=>setForm({...form,startTime:e.target.value})}/>
+<Inp label="結束時間" type="time" value={form.endTime} onChange={e=>setForm({...form,endTime:e.target.value})}/>
+</div>
+<Txt label="備註" value={form.note} onChange={e=>setForm({...form,note:e.target.value})}/>
+</div>
+<Btn onClick={save}/>
+</Modal>}
+</div>
+);
+}
+
+// ─── Album ──────────────────────────────────────────────────────
+function Album({ items, setItems }) {
+const [modal, setModal] = useState(false);
+const [edit, setEdit] = useState(null);
+const [viewImg, setViewImg] = useState(null);
+const blank = {project:"",stage:"施工前",title:"",url:"",note:"",date:""};
+const [form, setForm] = useState(blank);
+const open=(item=null)=>{setEdit(item);setForm(item||blank);setModal(true);};
+const save=()=>{
+if(!form.url.trim()&&!form.title.trim())return;
+if(edit)setItems(p=>p.map(i=>i.id===edit.id?{...i,...form}:i));
+else setItems(p=>[{...form,id:Date.now(),date:form.date||new Date().toLocaleDateString("zh-TW")},...p]);
+setModal(false);
+};
+const stages=["施工前","施工中","施工後","設計圖","其他"];
+const stageColor={"施工前":"gray","施工中":"blue","施工後":"green","設計圖":"purple","其他":"yellow"};
+const byProject={};
+items.forEach(i=>{if(!byProject[i.project])byProject[i.project]=[];byProject[i.project].push(i);});
+
+return(
+<>
+<div className="flex justify-between items-center mb-3">
+<span className="text-sm text-stone-400">共 {items.length} 張</span>
+<button onClick={()=>open()} className="text-xs bg-stone-800 text-white px-3 py-1.5 rounded-lg">＋ 新增照片</button>
+</div>
+{Object.keys(byProject).length===0&&<div className="text-center text-stone-400 py-12 text-sm">尚無照片，點右上角新增</div>}
+{Object.entries(byProject).map(([proj,imgs])=>(
+<div key={proj} className="mb-4">
+<div className="text-xs font-semibold text-stone-500 mb-2 px-1">🏠 {proj||"未分類"}</div>
+<div className="grid grid-cols-3 gap-2">
+{imgs.map(img=>(
+<div key={img.id} className="relative rounded-xl overflow-hidden border border-stone-100 bg-stone-50 aspect-square flex flex-col">
+{img.url?(
+<img src={img.url} alt={img.title} className="w-full h-full object-cover cursor-pointer" onClick={()=>setViewImg(img)} onError={e=>{e.target.style.display="none";}}/>
+):(
+<div className="flex-1 flex items-center justify-center text-2xl cursor-pointer" onClick={()=>setViewImg(img)}>🖼️</div>
+)}
+<div className={`absolute top-1 left-1 text-[9px] px-1.5 py-0.5 rounded-full text-white ${stageColor[img.stage]==="blue"?"bg-blue-500":stageColor[img.stage]==="green"?"bg-emerald-500":stageColor[img.stage]==="purple"?"bg-purple-500":"bg-stone-500"}`}>{img.stage}</div>
+<button onClick={()=>open(img)} className="absolute top-1 right-1 w-5 h-5 bg-white/80 rounded-full text-xs flex items-center justify-center">✏️</button>
+</div>
+))}
+</div>
+</div>
+))}
+{modal&&<Modal title={edit?"編輯照片":"新增照片"} onClose={()=>setModal(false)}>
+<div className="space-y-3">
+<Inp label="照片標題" value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/>
+<Sel label="所屬專案" options={["",...getProjectList()]} value={form.project} onChange={e=>setForm({...form,project:e.target.value})}/>
+<Sel label="施工階段" options={stages} value={form.stage} onChange={e=>setForm({...form,stage:e.target.value})}/>
+<Inp label="圖片網址（URL）" placeholder="https://..." value={form.url} onChange={e=>setForm({...form,url:e.target.value})}/>
+<div className="bg-stone-50 rounded-xl p-3 text-xs text-stone-400">
+💡 可將照片上傳到 Google 相簿或 Imgur，再貼入圖片連結
+</div>
+<Inp label="拍攝日期" type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/>
+<Txt label="備註" value={form.note} onChange={e=>setForm({...form,note:e.target.value})}/>
+</div>
+<Btn onClick={save}/>
+</Modal>}
+{viewImg&&(
+<div className="fixed inset-0 z-50 bg-black/90 flex flex-col" style={{maxWidth:430,margin:"0 auto"}}>
+<div className="flex justify-between items-center p-4">
+<div><div className="text-white text-sm font-medium">{viewImg.title||"照片"}</div><div className="text-white/60 text-xs">{viewImg.project} · {viewImg.stage}</div></div>
+<button onClick={()=>setViewImg(null)} className="text-white text-xl w-8 h-8 flex items-center justify-center">✕</button>
+</div>
+<div className="flex-1 flex items-center justify-center p-4">
+{viewImg.url?<img src={viewImg.url} alt={viewImg.title} className="max-w-full max-h-full rounded-xl object-contain"/>:<div className="text-white text-6xl">🖼️</div>}
+</div>
+{viewImg.note&&<div className="p-4 text-white/70 text-sm">{viewImg.note}</div>}
+<div className="flex gap-2 p-4">
+<button onClick={()=>{setViewImg(null);open(viewImg);}} className="flex-1 bg-white/20 text-white rounded-xl py-2.5 text-sm">✏️ 編輯</button>
+<button onClick={()=>{setItems(p=>p.filter(i=>i.id!==viewImg.id));setViewImg(null);}} className="flex-1 bg-red-500/80 text-white rounded-xl py-2.5 text-sm">🗑 刪除</button>
+</div>
+</div>
+)}
+</>
+);
+}
+
+// ─── Reports ────────────────────────────────────────────────────
+function Reports({ projects, tasks, ledger, clients, quotes, contracts, attendance }) {
+const [selected, setSelected] = useState(null);
+const [projectFilter, setProjectFilter] = useState("");
+
+const income=ledger.filter(i=>i.type==="收入").reduce((s,i)=>s+Number(i.amount||0),0);
+const expense=ledger.filter(i=>i.type==="支出").reduce((s,i)=>s+Number(i.amount||0),0);
+const profit=income-expense;
+
+const reportTypes = [
+{ id:"summary", icon:"📊", title:"公司月報", desc:"收支、專案、任務綜合報表" },
+{ id:"project", icon:"🏠", title:"專案報告", desc:"單一專案完整紀錄" },
+{ id:"finance", icon:"💰", title:"財務報表", desc:"收入支出明細" },
+{ id:"client", icon:"👥", title:"客戶報告", desc:"客戶名單與狀態" },
+];
+
+const printReport=()=>{
+window.print();
+};
+
+return(
+<div className="space-y-3">
+{!selected?(
+<>
+<div className="text-xs text-stone-400 px-1">選擇要產出的報表類型</div>
+{reportTypes.map(r=>(
+<button key={r.id} onClick={()=>setSelected(r.id)} className="w-full bg-white rounded-2xl p-4 shadow-sm border border-stone-100 flex items-center gap-3 text-left">
+<span className="text-2xl">{r.icon}</span>
+<div><div className="text-sm font-semibold text-stone-800">{r.title}</div><div className="text-xs text-stone-400">{r.desc}</div></div>
+<span className="ml-auto text-stone-300">›</span>
+</button>
+))}
+</>
+):(
+<div className="space-y-3">
+<button onClick={()=>setSelected(null)} className="text-xs text-stone-500 flex items-center gap-1">‹ 返回</button>
+
+{selected==="summary"&&(
+<div id="report-content" className="space-y-3">
+<div className="bg-stone-800 text-white rounded-2xl p-4">
+<div className="text-xs opacity-60 mb-1">公司月報 · {new Date().toLocaleDateString("zh-TW")}</div>
+<div className="text-lg font-bold">營運總覽</div>
+</div>
+<div className="grid grid-cols-2 gap-3">
+<div className="bg-white rounded-2xl p-4 border border-stone-100"><div className="text-xs text-stone-400 mb-1">累計收入</div><div className="text-lg font-bold text-emerald-600">NT${income.toLocaleString()}</div></div>
+<div className="bg-white rounded-2xl p-4 border border-stone-100"><div className="text-xs text-stone-400 mb-1">累計支出</div><div className="text-lg font-bold text-red-500">NT${expense.toLocaleString()}</div></div>
+<div className="bg-white rounded-2xl p-4 border border-stone-100"><div className="text-xs text-stone-400 mb-1">淨利潤</div><div className={`text-lg font-bold ${profit>=0?"text-stone-800":"text-red-500"}`}>NT${profit.toLocaleString()}</div></div>
+<div className="bg-white rounded-2xl p-4 border border-stone-100"><div className="text-xs text-stone-400 mb-1">利潤率</div><div className="text-lg font-bold text-stone-800">{income>0?((profit/income)*100).toFixed(1):0}%</div></div>
+</div>
+<div className="bg-white rounded-2xl p-4 border border-stone-100">
+<div className="text-xs text-stone-400 mb-3 font-medium">專案狀態</div>
+{["設計中","施工中","驗收中","完工"].map(s=>{
+const cnt=projects.filter(p=>p.status===s).length;
+return cnt>0?(
+<div key={s} className="flex justify-between items-center mb-2">
+<span className="text-sm text-stone-600">{s}</span>
+<span className="text-sm font-bold text-stone-800">{cnt} 個</span>
+</div>
+):null;
+})}
+</div>
+<div className="bg-white rounded-2xl p-4 border border-stone-100">
+<div className="text-xs text-stone-400 mb-3 font-medium">任務完成率</div>
+<div className="flex items-center gap-3">
+<div className="flex-1 bg-stone-100 rounded-full h-3">
+<div className="bg-emerald-500 h-3 rounded-full" style={{width:`${tasks.length>0?((tasks.filter(t=>t.done).length/tasks.length)*100).toFixed(0):0}%`}}/>
+</div>
+<span className="text-sm font-bold">{tasks.length>0?((tasks.filter(t=>t.done).length/tasks.length)*100).toFixed(0):0}%</span>
+</div>
+<div className="text-xs text-stone-400 mt-1">{tasks.filter(t=>t.done).length} / {tasks.length} 已完成</div>
+</div>
+</div>
+)}
+
+{selected==="finance"&&(
+<div className="space-y-3">
+<div className="bg-stone-800 text-white rounded-2xl p-4">
+<div className="text-xs opacity-60 mb-1">財務報表 · {new Date().toLocaleDateString("zh-TW")}</div>
+<div className="text-lg font-bold">收支明細</div>
+</div>
+{ledger.length===0&&<div className="text-center text-stone-400 py-8 text-sm">尚無帳本資料</div>}
+{ledger.map(i=>(
+<div key={i.id} className="bg-white rounded-xl p-3 border border-stone-100 flex justify-between items-center">
+<div><div className="text-sm text-stone-700">{i.category}</div><div className="text-xs text-stone-400">{i.project} · {i.date}</div></div>
+<div className={`text-sm font-bold ${i.type==="收入"?"text-emerald-600":"text-red-500"}`}>{i.type==="收入"?"+":"-"}NT${Number(i.amount||0).toLocaleString()}</div>
+</div>
+))}
+</div>
+)}
+
+{selected==="project"&&(
+<div className="space-y-3">
+<Sel label="選擇專案" options={["",...projects.map(p=>p.name)]} value={projectFilter} onChange={e=>setProjectFilter(e.target.value)}/>
+{projectFilter&&(()=>{
+const p=projects.find(x=>x.name===projectFilter);
+if(!p)return null;
+const pLedger=ledger.filter(i=>i.project===p.name);
+const pIncome=pLedger.filter(i=>i.type==="收入").reduce((s,i)=>s+Number(i.amount||0),0);
+const pExpense=pLedger.filter(i=>i.type==="支出").reduce((s,i)=>s+Number(i.amount||0),0);
+return(
+<div className="space-y-3">
+<div className="bg-stone-800 text-white rounded-2xl p-4">
+<div className="text-xs opacity-60 mb-1">專案報告</div>
+<div className="text-lg font-bold">{p.name}</div>
+<Badge color={{施工中:"blue",設計中:"yellow",驗收中:"green",完工:"green"}[p.status]||"gray"}>{p.status}</Badge>
+</div>
+<div className="bg-white rounded-2xl p-4 border border-stone-100 space-y-2">
+<div className="text-xs font-medium text-stone-400 mb-2">基本資料</div>
+{[["客戶",p.client],["地址",p.address],["預算",p.budget],["進度",`${p.progress||0}%`]].filter(([,v])=>v).map(([l,v])=>(
+<div key={l} className="flex justify-between text-sm"><span className="text-stone-400">{l}</span><span className="text-stone-700">{v}</span></div>
+))}
+</div>
+<div className="grid grid-cols-2 gap-3">
+<div className="bg-emerald-50 rounded-2xl p-3 border border-emerald-100"><div className="text-xs text-emerald-600">收入</div><div className="text-base font-bold text-emerald-700">NT${pIncome.toLocaleString()}</div></div>
+<div className="bg-red-50 rounded-2xl p-3 border border-red-100"><div className="text-xs text-red-500">支出</div><div className="text-base font-bold text-red-600">NT${pExpense.toLocaleString()}</div></div>
+</div>
+<div className="bg-white rounded-2xl p-3 border border-stone-100">
+<div className="text-xs font-medium text-stone-400 mb-2">相關任務</div>
+{tasks.filter(t=>t.project===p.name).map(t=>(
+<div key={t.id} className="flex items-center gap-2 mb-1">
+<span className={`text-xs ${t.done?"text-emerald-500":"text-stone-400"}`}>{t.done?"✓":"○"}</span>
+<span className={`text-sm ${t.done?"line-through text-stone-400":"text-stone-700"}`}>{t.title}</span>
+</div>
+))}
+</div>
+</div>
+);
+})()}
+</div>
+)}
+
+{selected==="client"&&(
+<div className="space-y-3">
+<div className="bg-stone-800 text-white rounded-2xl p-4">
+<div className="text-xs opacity-60 mb-1">客戶報告 · {new Date().toLocaleDateString("zh-TW")}</div>
+<div className="text-lg font-bold">共 {clients.length} 位客戶</div>
+</div>
+{clients.map(c=>(
+<div key={c.id} className="bg-white rounded-xl p-3 border border-stone-100">
+<div className="flex justify-between items-center">
+<div className="text-sm font-medium text-stone-800">{c.name}</div>
+<Badge color={{潛在客戶:"yellow",進行中:"blue",已完工:"green",長期客戶:"green",不合適:"gray"}[c.status]||"gray"}>{c.status}</Badge>
+</div>
+<div className="text-xs text-stone-400 mt-0.5">{c.phone} · {c.style}</div>
+</div>
+))}
+</div>
+)}
+
+<button onClick={printReport} className="w-full bg-stone-800 text-white rounded-xl py-3 text-sm font-medium mt-2">🖨️ 列印 / 儲存 PDF</button>
+<div className="text-xs text-stone-400 text-center">按下後選擇「儲存為 PDF」即可匯出</div>
+</div>
+)}
+</div>
+);
+}
+
+
+// ─── Notification System ─────────────────────────────────────────
+function useNotifications(tasks, projects, inventory, tracking, leave, overtime, acceptance, pending, quotes) {
+const today = new Date();
+const todayStr = today.toISOString().split("T")[0];
+const notes = [];
+
+// Overdue tasks
+tasks.filter(t => !t.done && t.due).forEach(t => {
+const due = new Date(t.due);
+if (due < today) notes.push({ type: "warning", category: "任務逾期", text: `「${t.title}」已逾期`, id: `task-${t.id}` });
+else if ((due - today) / 86400000 <= 1) notes.push({ type: "info", category: "任務提醒", text: `「${t.title}」今日截止`, id: `task-due-${t.id}` });
+});
+
+// Low inventory
+inventory.filter(i => Number(i.qty||0) <= Number(i.minQty||0)).forEach(i => {
+notes.push({ type: "warning", category: "庫存不足", text: `「${i.name}」庫存剩 ${i.qty} ${i.unit}，低於安全庫存`, id: `inv-${i.id}` });
+});
+
+// Delayed tracking
+tracking.filter(i => i.status === "延誤").forEach(i => {
+notes.push({ type: "warning", category: "備料延誤", text: `「${i.material}」備料延誤`, id: `track-${i.id}` });
+});
+
+// Pending leave/overtime awaiting approval
+leave.filter(i => i.status === "待審").forEach(i => {
+notes.push({ type: "info", category: "假單待審", text: `${i.name} 申請 ${i.type}（${i.days}天）待審核`, id: `leave-${i.id}` });
+});
+overtime.filter(i => i.status === "待審").forEach(i => {
+notes.push({ type: "info", category: "加班待審", text: `${i.name} 加班申請待審核`, id: `ot-${i.id}` });
+});
+
+// Pending acceptance
+acceptance.filter(i => i.status === "待驗收").forEach(i => {
+notes.push({ type: "info", category: "待驗收", text: `「${i.project}」等待驗收`, id: `acc-${i.id}` });
+});
+
+// Pending client confirmation
+pending.filter(i => i.status === "待確認").forEach(i => {
+notes.push({ type: "warning", category: "待客戶確認", text: `「${i.project}」${i.type}待客戶確認`, id: `pend-${i.id}` });
+});
+
+// Quotes expiring soon
+quotes.filter(i => i.validUntil && i.status !== "已核准").forEach(i => {
+const exp = new Date(i.validUntil);
+const diff = (exp - today) / 86400000;
+if (diff >= 0 && diff <= 3) notes.push({ type: "warning", category: "報價即將到期", text: `「${i.project}」報價 ${Math.ceil(diff)} 天後到期`, id: `quote-${i.id}` });
+else if (diff < 0) notes.push({ type: "warning", category: "報價已到期", text: `「${i.project}」報價已到期`, id: `quote-exp-${i.id}` });
+});
+
+// Projects with no progress update (progress = 0 and status is 施工中)
+projects.filter(p => p.status === "施工中" && (p.progress||0) === 0).forEach(p => {
+notes.push({ type: "info", category: "專案提醒", text: `「${p.name}」施工中但進度未更新`, id: `proj-${p.id}` });
+});
+
+return notes;
+}
+
+function NotificationPanel({ notifications, onClose, onClearAll }) {
+const typeColor = { warning: "bg-amber-50 border-amber-200 text-amber-800", info: "bg-blue-50 border-blue-200 text-blue-800" };
+const typeIcon = { warning: "⚠️", info: "ℹ️" };
+return (
+<div className="fixed inset-0 z-50 flex flex-col" style={{maxWidth:430,margin:"0 auto"}}>
+<div className="absolute inset-0 bg-black/40" onClick={onClose}/>
+<div className="relative mt-16 bg-white rounded-t-3xl flex-1 overflow-y-auto shadow-2xl">
+<div className="sticky top-0 bg-white px-5 pt-5 pb-3 border-b border-stone-100 flex justify-between items-center">
+<div>
+<h2 className="text-base font-semibold text-stone-800">通知中心</h2>
+<div className="text-xs text-stone-400">{notifications.length} 則通知</div>
+</div>
+<div className="flex gap-2">
+{notifications.length > 0 && <button onClick={onClearAll} className="text-xs text-red-400 px-3 py-1.5 rounded-lg bg-red-50">全部清除</button>}
+<button onClick={onClose} className="text-stone-400 text-xl w-8 h-8 flex items-center justify-center">✕</button>
+</div>
+</div>
+<div className="p-4 space-y-2">
+{notifications.length === 0 && (
+<div className="text-center py-16">
+<div className="text-4xl mb-3">🎉</div>
+<div className="text-stone-400 text-sm">目前沒有通知</div>
+</div>
+)}
+{notifications.map(n => (
+<div key={n.id} className={`flex items-start gap-3 rounded-xl px-4 py-3 text-sm border ${typeColor[n.type]}`}>
+<span className="flex-shrink-0 mt-0.5">{typeIcon[n.type]}</span>
+<div>
+<div className="font-medium text-xs mb-0.5">{n.category}</div>
+<div>{n.text}</div>
+</div>
+</div>
+))}
+</div>
+<div className="h-8"/>
+</div>
+</div>
+);
+}
+
 export default function App() {
 const [activeId, setActiveId] = useState("dashboard");
 const [sidebarOpen, setSidebarOpen] = useState(false);
+const [notifOpen, setNotifOpen] = useState(false);
+const [dismissed, setDismissed] = useLocalStorage("dismissed_notifs", []);
 const [tasks, setTasks] = useLocalStorage("tasks", []);
 const [projects, setProjects] = useLocalStorage("projects", []);
 const [inquiries, setInquiries] = useLocalStorage("inquiries", []);
@@ -1162,11 +1823,21 @@ const [inventory, setInventory] = useLocalStorage("inventory", []);
 const [tracking, setTracking] = useLocalStorage("tracking", []);
 const [losses, setLosses] = useLocalStorage("losses", []);
 const [appointments, setAppointments] = useLocalStorage("appointments", []);
+const [clients, setClients] = useLocalStorage("clients", []);
+const [schedule, setSchedule] = useLocalStorage("schedule", []);
+const [album, setAlbum] = useLocalStorage("album", []);
+const [companyInfo, setCompanyInfo] = useLocalStorage("companyInfo", {});
+const [notifSettings, setNotifSettings] = useLocalStorage("notifSettings", {taskOverdue:true,taskDueToday:true,lowInventory:true,pendingApproval:true,quoteExpiry:true,projectNoUpdate:true});
+const [menuCustom, setMenuCustom] = useLocalStorage("menuCustom", {});
+
+const allNotifs = useNotifications(tasks, projects, inventory, tracking, leave, overtime, acceptance, pending, quotes);
+const notifications = allNotifs.filter(n => !dismissed.includes(n.id));
 
 const clearAll=()=>{
 ["tasks","projects","inquiries","contracts","quotes","inspection","acceptance","pending",
 "knowledge","lighting","design","ledger","purchase","expense","payroll","monthly",
-"attendance","leave","overtime","materials","inventory","tracking","losses","appointments"
+"attendance","leave","overtime","materials","inventory","tracking","losses","appointments",
+"companyInfo","notifSettings","dismissed_notifs","menuCustom","clients","schedule","album"
 ].forEach(k=>localStorage.removeItem(k));
 window.location.reload();
 };
@@ -1178,6 +1849,10 @@ switch(activeId){
 case "dashboard": return <Dashboard tasks={tasks} projects={projects} attendance={attendance} setActiveId={setActiveId}/>;
 case "tasks": return <Tasks tasks={tasks} setTasks={setTasks}/>;
 case "calendar": return <Calendar tasks={tasks}/>;
+case "clients": return <Clients items={clients} setItems={setClients}/>;
+case "schedule": return <Schedule items={schedule} setItems={setSchedule} projects={projects}/>;
+case "album": return <Album items={album} setItems={setAlbum}/>;
+case "reports": return <Reports projects={projects} tasks={tasks} ledger={ledger} clients={clients} quotes={quotes} contracts={contracts} attendance={attendance}/>;
 case "appointments": return <Appointments2 items={appointments} setItems={setAppointments}/>;
 case "inquiries": return <Inquiries items={inquiries} setItems={setInquiries}/>;
 case "projects": return <Projects items={projects} setItems={setProjects}/>;
@@ -1204,7 +1879,7 @@ case "inventory": return <Inventory items={inventory} setItems={setInventory}/>;
 case "tracking": return <Tracking items={tracking} setItems={setTracking}/>;
 case "profit": return <Profit ledger={ledger} projects={projects}/>;
 case "losses": return <Losses items={losses} setItems={setLosses}/>;
-case "settings": return <Settings onClearAll={clearAll}/>;
+case "settings": return <Settings onClearAll={clearAll} companyInfo={companyInfo} setCompanyInfo={setCompanyInfo} notifSettings={notifSettings} setNotifSettings={setNotifSettings} menuCustom={menuCustom} setMenuCustom={setMenuCustom}/>;
 default: return <div className="text-center text-stone-400 py-16 text-sm">🔧 功能開發中</div>;
 }
 };
@@ -1216,10 +1891,10 @@ return(
 <button onClick={()=>setSidebarOpen(true)} className="w-9 h-9 flex flex-col justify-center gap-1.5 items-center">
 <span className="block w-5 h-0.5 bg-stone-600"/><span className="block w-5 h-0.5 bg-stone-600"/><span className="block w-3 h-0.5 bg-stone-600"/>
 </button>
-<span className="text-sm font-semibold text-stone-700">{activeItem?.label||"工作面板"}</span>
-<button className="w-9 h-9 flex items-center justify-center relative">
+<span className="text-sm font-semibold text-stone-700">{activeItem?(menuCustom[activeItem.id]?.label||activeItem.label):"工作面板"}</span>
+<button onClick={()=>setNotifOpen(true)} className="w-9 h-9 flex items-center justify-center relative">
 <span className="text-xl">🔔</span>
-{tasks.filter(t=>!t.done).length>0&&<span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"/>}
+{notifications.length>0&&<span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"><span className="text-white text-[9px] font-bold">{notifications.length}</span></span>}
 </button>
 </div>
 {sidebarOpen&&(
@@ -1233,7 +1908,8 @@ return(
 {section.items.map(item=>(
 <button key={item.id} onClick={()=>{setActiveId(item.id);setSidebarOpen(false);}}
 className={`w-full flex items-center gap-3 px-5 py-3 text-sm text-left ${activeId===item.id?"bg-stone-100 font-semibold text-stone-900 rounded-xl mx-2 w-[calc(100%-16px)]":"text-stone-600 hover:bg-stone-50"}`}>
-<span>{item.icon}</span><span>{item.label}</span>
+<span>{(menuCustom[item.id]?.icon!==undefined?menuCustom[item.id].icon:item.icon)}</span>
+<span>{(menuCustom[item.id]?.label!==undefined?menuCustom[item.id].label:item.label)}</span>
 </button>
 ))}
 </div>
@@ -1242,15 +1918,20 @@ className={`w-full flex items-center gap-3 px-5 py-3 text-sm text-left ${activeI
 </div>
 </div>
 )}
+{notifOpen&&<NotificationPanel notifications={notifications} onClose={()=>setNotifOpen(false)} onClearAll={()=>{setDismissed(allNotifs.map(n=>n.id));setNotifOpen(false);}}/>}
 <div className="px-4 pt-4 pb-24">{renderPage()}</div>
 <div className="fixed bottom-0 bg-white border-t border-stone-100 flex items-center justify-around py-2 z-30" style={{maxWidth:430,left:"50%",transform:"translateX(-50%)",width:"100%"}}>
-{[{id:"dashboard",icon:"⊞",label:"面板"},{id:"tasks",icon:"✓",label:"任務"},{id:"projects",icon:"🏠",label:"專案"},{id:"ledger",icon:"💰",label:"財務"}].map(tab=>(
+{[{id:"dashboard",icon:"🏠",label:"主頁"},{id:"tasks",icon:"📋",label:"任務"},{id:"projects",icon:"🏠",label:"專案"},{id:"schedule",icon:"🗓",label:"排程"}].map(tab=>{
+const customIcon = menuCustom[tab.id]?.icon !== undefined ? menuCustom[tab.id].icon : tab.icon;
+const customLabel = menuCustom[tab.id]?.label !== undefined ? menuCustom[tab.id].label.slice(0,4) : tab.label;
+return (
 <button key={tab.id} onClick={()=>setActiveId(tab.id)} className={`flex flex-col items-center gap-0.5 px-4 py-1 ${activeId===tab.id?"text-stone-900":"text-stone-400"}`}>
-<span className="text-lg">{tab.icon}</span>
-<span className="text-xs">{tab.label}</span>
+<span className="text-lg">{customIcon}</span>
+<span className="text-xs">{customLabel}</span>
 {activeId===tab.id&&<span className="w-1 h-1 bg-stone-800 rounded-full"/>}
 </button>
-))}
+);
+})}
 </div>
 </div>
 );
