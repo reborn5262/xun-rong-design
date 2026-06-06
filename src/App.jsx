@@ -26,6 +26,7 @@ const NAV_SECTIONS = [
 { icon: "📸", label: "專案相簿", id: "album" },
 { icon: "📄", label: "合約管理", id: "contracts" },
 { icon: "💰", label: "報價單", id: "quotes" },
+{ icon: "📋", label: "初步報價", id: "quickquote" },
 { icon: "🔍", label: "工程檢核", id: "inspection" },
 { icon: "✅", label: "工程驗收", id: "acceptance" },
 { icon: "👤", label: "待客戶確認", id: "pending" },
@@ -1264,6 +1265,422 @@ onChange={e=>setMenuCustom(prev=>({...prev,[item.id]:{...(prev[item.id]||{}),lab
 }
 
 
+
+// ─── Quick Quote System ─────────────────────────────────────────
+const QUOTE_TEMPLATES = {
+living: { label:"客廳", icon:"🛋️", items:[
+{name:"拆除工程",unit:"式",qty:1,price:15000},
+{name:"輕隔間工程",unit:"才",qty:0,price:350},
+{name:"木作天花板",unit:"才",qty:0,price:450},
+{name:"木作電視牆",unit:"式",qty:1,price:45000},
+{name:"木作展示櫃",unit:"尺",qty:0,price:6500},
+{name:"油漆工程",unit:"才",qty:0,price:120},
+{name:"地板鋪設（超耐磨）",unit:"才",qty:0,price:280},
+{name:"燈具安裝",unit:"式",qty:1,price:8000},
+{name:"窗簾安裝",unit:"式",qty:1,price:12000},
+]},
+bedroom: { label:"臥室", icon:"🛏️", items:[
+{name:"拆除工程",unit:"式",qty:1,price:8000},
+{name:"木作天花板",unit:"才",qty:0,price:450},
+{name:"系統衣櫃",unit:"尺",qty:0,price:7500},
+{name:"床頭背板",unit:"式",qty:1,price:25000},
+{name:"油漆工程",unit:"才",qty:0,price:120},
+{name:"地板鋪設（超耐磨）",unit:"才",qty:0,price:280},
+{name:"燈具安裝",unit:"式",qty:1,price:5000},
+{name:"窗簾安裝",unit:"式",qty:1,price:8000},
+]},
+kitchen: { label:"廚房", icon:"🍳", items:[
+{name:"拆除工程",unit:"式",qty:1,price:20000},
+{name:"水電配管",unit:"式",qty:1,price:35000},
+{name:"廚具（上下櫃）",unit:"尺",qty:0,price:12000},
+{name:"磁磚工程",unit:"才",qty:0,price:380},
+{name:"油煙機安裝",unit:"式",qty:1,price:5000},
+{name:"廚房門施作",unit:"式",qty:1,price:15000},
+]},
+bathroom: { label:"浴室", icon:"🚿", items:[
+{name:"拆除工程",unit:"式",qty:1,price:18000},
+{name:"防水工程",unit:"才",qty:0,price:350},
+{name:"磁磚工程",unit:"才",qty:0,price:420},
+{name:"衛浴設備",unit:"式",qty:1,price:45000},
+{name:"水電配管",unit:"式",qty:1,price:25000},
+{name:"乾濕分離",unit:"式",qty:1,price:18000},
+{name:"浴室門施作",unit:"式",qty:1,price:12000},
+]},
+dining: { label:"餐廳", icon:"🍽️", items:[
+{name:"木作酒櫃/餐邊櫃",unit:"尺",qty:0,price:6500},
+{name:"油漆工程",unit:"才",qty:0,price:120},
+{name:"地板鋪設",unit:"才",qty:0,price:280},
+{name:"燈具安裝",unit:"式",qty:1,price:6000},
+{name:"壁紙/牆面造型",unit:"式",qty:1,price:15000},
+]},
+study: { label:"書房", icon:"📚", items:[
+{name:"系統書櫃",unit:"尺",qty:0,price:7000},
+{name:"書桌訂製",unit:"式",qty:1,price:20000},
+{name:"木作天花板",unit:"才",qty:0,price:450},
+{name:"油漆工程",unit:"才",qty:0,price:120},
+{name:"地板鋪設",unit:"才",qty:0,price:280},
+{name:"燈具安裝",unit:"式",qty:1,price:4000},
+]},
+};
+
+const EXTRA_ITEMS = [
+{name:"設計費",unit:"坪",qty:0,price:8000,category:"設計"},
+{name:"工程管理費",unit:"式",qty:1,price:30000,category:"管理"},
+{name:"清潔費",unit:"式",qty:1,price:8000,category:"雜項"},
+{name:"運費/搬運費",unit:"式",qty:1,price:5000,category:"雜項"},
+{name:"保護工程",unit:"式",qty:1,price:12000,category:"施工"},
+{name:"鋁窗更換",unit:"才",qty:0,price:650,category:"門窗"},
+{name:"冷氣安裝",unit:"台",qty:0,price:8000,category:"設備"},
+{name:"弱電工程",unit:"式",qty:1,price:20000,category:"水電"},
+{name:"地板架高",unit:"才",qty:0,price:180,category:"地板"},
+];
+
+function QuickQuote({ items: savedQuotes, setItems: setSavedQuotes }) {
+const [step, setStep] = useState(1); // 1=基本資訊, 2=選空間, 3=調整項目, 4=總覽
+const [quoteInfo, setQuoteInfo] = useState({
+client:"", projectName:"", date:new Date().toISOString().split("T")[0],
+size:"", style:"現代風", note:"", discount:0, taxRate:5
+});
+const [selectedRooms, setSelectedRooms] = useState({});
+const [lineItems, setLineItems] = useState([]);
+const [showSaved, setShowSaved] = useState(false);
+const [viewQuote, setViewQuote] = useState(null);
+
+const toggleRoom = (roomKey) => {
+const tmpl = QUOTE_TEMPLATES[roomKey];
+if (selectedRooms[roomKey]) {
+const newRooms = {...selectedRooms};
+delete newRooms[roomKey];
+setSelectedRooms(newRooms);
+setLineItems(prev => prev.filter(i => i.roomKey !== roomKey));
+} else {
+setSelectedRooms(prev => ({...prev, [roomKey]: true}));
+setLineItems(prev => [
+...prev,
+...tmpl.items.map((item,i) => ({
+...item, id: `${roomKey}-${i}-${Date.now()}`,
+roomKey, enabled: true
+}))
+]);
+}
+};
+
+const addExtraItem = (item) => {
+setLineItems(prev => [...prev, {...item, id:`extra-${Date.now()}`, roomKey:"extra", enabled:true}]);
+};
+
+const updateItem = (id, field, val) => {
+setLineItems(prev => prev.map(i => i.id===id ? {...i,[field]:val} : i));
+};
+
+const removeItem = (id) => setLineItems(prev => prev.filter(i => i.id!==id));
+
+const addCustomItem = () => {
+setLineItems(prev => [...prev, {
+id:`custom-${Date.now()}`, name:"自訂項目", unit:"式", qty:1, price:0,
+roomKey:"custom", enabled:true
+}]);
+};
+
+const subtotal = lineItems.filter(i=>i.enabled).reduce((s,i)=>s+Number(i.qty||0)*Number(i.price||0),0);
+const discountAmt = Math.round(subtotal * (Number(quoteInfo.discount)||0) / 100);
+const afterDiscount = subtotal - discountAmt;
+const taxAmt = Math.round(afterDiscount * (Number(quoteInfo.taxRate)||0) / 100);
+const total = afterDiscount + taxAmt;
+
+const saveQuote = () => {
+const q = {
+id: Date.now(),
+...quoteInfo,
+rooms: Object.keys(selectedRooms),
+lineItems: lineItems.filter(i=>i.enabled),
+subtotal, discountAmt, taxAmt, total,
+savedAt: new Date().toLocaleDateString("zh-TW"),
+status:"草稿"
+};
+setSavedQuotes(prev => [q, ...prev]);
+alert("✅ 報價已儲存！");
+};
+
+const resetQuote = () => {
+setStep(1);
+setQuoteInfo({client:"",projectName:"",date:new Date().toISOString().split("T")[0],size:"",style:"現代風",note:"",discount:0,taxRate:5});
+setSelectedRooms({});
+setLineItems([]);
+};
+
+if (showSaved) return (
+<div className="space-y-3">
+<button onClick={()=>{setShowSaved(false);setViewQuote(null);}} className="text-xs text-stone-500 flex items-center gap-1">‹ 返回</button>
+<div className="flex justify-between items-center">
+<span className="text-sm text-stone-400">共 {savedQuotes.length} 份報價</span>
+<button onClick={()=>setShowSaved(false)} className="text-xs bg-stone-800 text-white px-3 py-1.5 rounded-lg">＋ 新增報價</button>
+</div>
+{savedQuotes.length===0&&<div className="text-center text-stone-400 py-12 text-sm">尚無儲存的報價</div>}
+{savedQuotes.map(q=>(
+<div key={q.id} className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100">
+<div className="flex justify-between items-start mb-1">
+<div className="font-semibold text-stone-800 text-sm">{q.client||"未命名客戶"}</div>
+<Badge color={q.status==="已確認"?"green":q.status==="已拒絕"?"red":"gray"}>{q.status||"草稿"}</Badge>
+</div>
+<div className="text-xs text-stone-400">{q.projectName} · {q.savedAt}</div>
+<div className="text-base font-bold text-stone-800 mt-1">NT${q.total.toLocaleString()}</div>
+<div className="text-xs text-stone-400">{(q.rooms||[]).map(r=>QUOTE_TEMPLATES[r]?.label).filter(Boolean).join("、")}</div>
+<div className="flex gap-2 mt-3 pt-3 border-t border-stone-50">
+<button onClick={()=>setViewQuote(q)} className="flex-1 text-xs text-stone-500 py-1.5 rounded-lg bg-stone-50">📄 查看</button>
+<button onClick={()=>setSavedQuotes(p=>p.map(x=>x.id===q.id?{...x,status:x.status==="已確認"?"草稿":"已確認"}:x))} className="flex-1 text-xs text-emerald-600 py-1.5 rounded-lg bg-emerald-50">{q.status==="已確認"?"取消確認":"✓ 確認"}</button>
+<button onClick={()=>setSavedQuotes(p=>p.filter(x=>x.id!==q.id))} className="flex-1 text-xs text-red-400 py-1.5 rounded-lg bg-red-50">🗑 刪除</button>
+</div>
+</div>
+))}
+{viewQuote&&(
+<div className="fixed inset-0 z-50 flex flex-col bg-white" style={{maxWidth:430,margin:"0 auto"}}>
+<div className="flex justify-between items-center px-4 py-3 border-b border-stone-100">
+<div><div className="text-sm font-semibold">{viewQuote.client} 報價單</div><div className="text-xs text-stone-400">{viewQuote.savedAt}</div></div>
+<button onClick={()=>setViewQuote(null)} className="text-stone-400 text-xl">✕</button>
+</div>
+<div className="flex-1 overflow-y-auto p-4 space-y-3">
+<div className="bg-stone-800 text-white rounded-2xl p-4">
+<div className="text-xs opacity-60 mb-1">初步報價單</div>
+<div className="text-lg font-bold">{viewQuote.client}</div>
+<div className="text-sm opacity-80">{viewQuote.projectName}</div>
+<div className="text-xs opacity-60 mt-1">{viewQuote.date} · {viewQuote.style}</div>
+</div>
+<div className="bg-white rounded-2xl border border-stone-100 overflow-hidden">
+<div className="grid grid-cols-12 text-xs text-stone-400 px-3 py-2 bg-stone-50 font-medium">
+<div className="col-span-6">項目</div><div className="col-span-2 text-center">數量</div><div className="col-span-2 text-center">單位</div><div className="col-span-2 text-right">小計</div>
+</div>
+{viewQuote.lineItems.map((item,i)=>(
+<div key={i} className="grid grid-cols-12 text-xs px-3 py-2 border-t border-stone-50">
+<div className="col-span-6 text-stone-700">{item.name}</div>
+<div className="col-span-2 text-center text-stone-500">{item.qty}</div>
+<div className="col-span-2 text-center text-stone-400">{item.unit}</div>
+<div className="col-span-2 text-right text-stone-700">{(Number(item.qty)*Number(item.price)).toLocaleString()}</div>
+</div>
+))}
+</div>
+<div className="bg-white rounded-2xl p-4 border border-stone-100 space-y-2">
+<div className="flex justify-between text-sm"><span className="text-stone-400">小計</span><span>NT${viewQuote.subtotal.toLocaleString()}</span></div>
+{viewQuote.discountAmt>0&&<div className="flex justify-between text-sm"><span className="text-stone-400">折扣</span><span className="text-red-500">-NT${viewQuote.discountAmt.toLocaleString()}</span></div>}
+{viewQuote.taxAmt>0&&<div className="flex justify-between text-sm"><span className="text-stone-400">稅金 ({viewQuote.taxRate}%)</span><span>NT${viewQuote.taxAmt.toLocaleString()}</span></div>}
+<div className="flex justify-between text-base font-bold pt-2 border-t border-stone-100"><span>總計</span><span className="text-stone-800">NT${viewQuote.total.toLocaleString()}</span></div>
+</div>
+{viewQuote.note&&<div className="bg-stone-50 rounded-xl p-3 text-xs text-stone-500">{viewQuote.note}</div>}
+<button onClick={()=>window.print()} className="w-full bg-stone-800 text-white rounded-xl py-3 text-sm font-medium">🖨️ 列印 / 儲存 PDF</button>
+</div>
+</div>
+)}
+</div>
+);
+
+return (
+<div className="space-y-4">
+{/* Header */}
+<div className="flex justify-between items-center">
+<div className="flex gap-1">
+{[1,2,3,4].map(s=>(
+<div key={s} className={`w-8 h-1.5 rounded-full ${step>=s?"bg-stone-800":"bg-stone-200"}`}/>
+))}
+</div>
+<button onClick={()=>setShowSaved(true)} className="text-xs text-stone-500 border border-stone-200 px-3 py-1.5 rounded-lg">
+📄 已儲存 ({savedQuotes.length})
+</button>
+</div>
+
+{/* Step 1: 基本資訊 */}
+{step===1&&(
+<div className="space-y-3">
+<div className="bg-stone-800 text-white rounded-2xl p-4">
+<div className="text-xs opacity-60 mb-1">步驟 1 / 4</div>
+<div className="text-base font-bold">填寫基本資訊</div>
+</div>
+<Inp label="客戶姓名" placeholder="例：陳先生" value={quoteInfo.client} onChange={e=>setQuoteInfo({...quoteInfo,client:e.target.value})}/>
+<Inp label="專案名稱" placeholder="例：大安區陳宅翻修" value={quoteInfo.projectName} onChange={e=>setQuoteInfo({...quoteInfo,projectName:e.target.value})}/>
+<div className="grid grid-cols-2 gap-3">
+<Inp label="報價日期" type="date" value={quoteInfo.date} onChange={e=>setQuoteInfo({...quoteInfo,date:e.target.value})}/>
+<Inp label="室內坪數" placeholder="例：30" value={quoteInfo.size} onChange={e=>setQuoteInfo({...quoteInfo,size:e.target.value})}/>
+</div>
+<Sel label="設計風格" options={["現代風","北歐風","工業風","日式風","古典風","混搭風","其他"]} value={quoteInfo.style} onChange={e=>setQuoteInfo({...quoteInfo,style:e.target.value})}/>
+<button onClick={()=>setStep(2)} className="w-full bg-stone-800 text-white rounded-xl py-3 text-sm font-medium">下一步 →</button>
+</div>
+)}
+
+{/* Step 2: 選空間 */}
+{step===2&&(
+<div className="space-y-3">
+<div className="bg-stone-800 text-white rounded-2xl p-4">
+<div className="text-xs opacity-60 mb-1">步驟 2 / 4</div>
+<div className="text-base font-bold">選擇施作空間</div>
+<div className="text-xs opacity-60 mt-1">可多選，系統自動帶入建議項目</div>
+</div>
+<div className="grid grid-cols-3 gap-2">
+{Object.entries(QUOTE_TEMPLATES).map(([key,tmpl])=>(
+<button key={key} onClick={()=>toggleRoom(key)}
+className={`rounded-2xl p-3 text-center border-2 transition-all ${selectedRooms[key]?"border-stone-800 bg-stone-800 text-white":"border-stone-200 bg-white text-stone-600"}`}>
+<div className="text-2xl mb-1">{tmpl.icon}</div>
+<div className="text-xs font-medium">{tmpl.label}</div>
+</button>
+))}
+</div>
+{Object.keys(selectedRooms).length>0&&(
+<div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-700">
+✅ 已選：{Object.keys(selectedRooms).map(k=>QUOTE_TEMPLATES[k].label).join("、")}
+</div>
+)}
+<div className="flex gap-2">
+<button onClick={()=>setStep(1)} className="flex-1 bg-stone-100 text-stone-600 rounded-xl py-3 text-sm">← 返回</button>
+<button onClick={()=>setStep(3)} disabled={Object.keys(selectedRooms).length===0} className={`flex-1 rounded-xl py-3 text-sm font-medium ${Object.keys(selectedRooms).length>0?"bg-stone-800 text-white":"bg-stone-200 text-stone-400"}`}>下一步 →</button>
+</div>
+</div>
+)}
+
+{/* Step 3: 調整項目 */}
+{step===3&&(
+<div className="space-y-3">
+<div className="bg-stone-800 text-white rounded-2xl p-4">
+<div className="text-xs opacity-60 mb-1">步驟 3 / 4</div>
+<div className="text-base font-bold">調整工程項目</div>
+<div className="text-xs opacity-60 mt-1">可修改數量、單價，或取消勾選不需要的項目</div>
+</div>
+
+{Object.keys(selectedRooms).map(roomKey=>(
+<div key={roomKey} className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+<div className="flex items-center gap-2 px-4 py-3 bg-stone-50">
+<span>{QUOTE_TEMPLATES[roomKey].icon}</span>
+<span className="text-sm font-semibold text-stone-700">{QUOTE_TEMPLATES[roomKey].label}</span>
+</div>
+{lineItems.filter(i=>i.roomKey===roomKey).map(item=>(
+<div key={item.id} className={`border-t border-stone-50 px-3 py-2 ${!item.enabled?"opacity-40":""}`}>
+<div className="flex items-center gap-2 mb-1">
+<button onClick={()=>updateItem(item.id,"enabled",!item.enabled)} className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center text-[10px] ${item.enabled?"bg-stone-800 border-stone-800 text-white":"border-stone-300"}`}>{item.enabled?"✓":""}</button>
+<input className="flex-1 text-xs text-stone-700 bg-transparent border-none outline-none" value={item.name} onChange={e=>updateItem(item.id,"name",e.target.value)}/>
+<button onClick={()=>removeItem(item.id)} className="text-red-300 text-xs flex-shrink-0">✕</button>
+</div>
+<div className="flex items-center gap-2 ml-6">
+<input className="w-16 border border-stone-200 rounded-lg px-2 py-1 text-xs text-center" type="number" value={item.qty} onChange={e=>updateItem(item.id,"qty",e.target.value)} placeholder="數量"/>
+<span className="text-xs text-stone-400">{item.unit}</span>
+<span className="text-xs text-stone-400">×</span>
+<input className="w-20 border border-stone-200 rounded-lg px-2 py-1 text-xs text-center" type="number" value={item.price} onChange={e=>updateItem(item.id,"price",e.target.value)} placeholder="單價"/>
+<span className="text-xs text-stone-400 ml-auto">{item.enabled?(Number(item.qty||0)*Number(item.price||0)).toLocaleString():"-"}</span>
+</div>
+</div>
+))}
+</div>
+))}
+
+{/* Extra items */}
+<div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+<div className="px-4 py-3 bg-stone-50">
+<span className="text-sm font-semibold text-stone-700">➕ 其他費用</span>
+</div>
+<div className="p-3 flex flex-wrap gap-2">
+{EXTRA_ITEMS.map((item,i)=>(
+<button key={i} onClick={()=>addExtraItem(item)} className="text-xs bg-stone-50 border border-stone-200 rounded-lg px-2 py-1 text-stone-600">{item.name}</button>
+))}
+</div>
+{lineItems.filter(i=>i.roomKey==="extra"||i.roomKey==="custom").map(item=>(
+<div key={item.id} className={`border-t border-stone-50 px-3 py-2 ${!item.enabled?"opacity-40":""}`}>
+<div className="flex items-center gap-2 mb-1">
+<button onClick={()=>updateItem(item.id,"enabled",!item.enabled)} className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center text-[10px] ${item.enabled?"bg-stone-800 border-stone-800 text-white":"border-stone-300"}`}>{item.enabled?"✓":""}</button>
+<input className="flex-1 text-xs text-stone-700 bg-transparent border-none outline-none" value={item.name} onChange={e=>updateItem(item.id,"name",e.target.value)}/>
+<button onClick={()=>removeItem(item.id)} className="text-red-300 text-xs">✕</button>
+</div>
+<div className="flex items-center gap-2 ml-6">
+<input className="w-16 border border-stone-200 rounded-lg px-2 py-1 text-xs text-center" type="number" value={item.qty} onChange={e=>updateItem(item.id,"qty",e.target.value)}/>
+<span className="text-xs text-stone-400">{item.unit}</span>
+<span className="text-xs text-stone-400">×</span>
+<input className="w-20 border border-stone-200 rounded-lg px-2 py-1 text-xs text-center" type="number" value={item.price} onChange={e=>updateItem(item.id,"price",e.target.value)}/>
+<span className="text-xs text-stone-400 ml-auto">{item.enabled?(Number(item.qty||0)*Number(item.price||0)).toLocaleString():"-"}</span>
+</div>
+</div>
+))}
+<div className="p-3 border-t border-stone-50">
+<button onClick={addCustomItem} className="w-full text-xs text-stone-400 border border-dashed border-stone-200 rounded-xl py-2">＋ 自訂項目</button>
+</div>
+</div>
+
+<div className="bg-stone-50 rounded-2xl p-3 border border-stone-200">
+<div className="flex justify-between text-sm font-semibold">
+<span className="text-stone-600">目前小計</span>
+<span className="text-stone-800">NT${subtotal.toLocaleString()}</span>
+</div>
+</div>
+
+<div className="flex gap-2">
+<button onClick={()=>setStep(2)} className="flex-1 bg-stone-100 text-stone-600 rounded-xl py-3 text-sm">← 返回</button>
+<button onClick={()=>setStep(4)} className="flex-1 bg-stone-800 text-white rounded-xl py-3 text-sm font-medium">下一步 →</button>
+</div>
+</div>
+)}
+
+{/* Step 4: 總覽 */}
+{step===4&&(
+<div className="space-y-3">
+<div className="bg-stone-800 text-white rounded-2xl p-4">
+<div className="text-xs opacity-60 mb-1">步驟 4 / 4</div>
+<div className="text-base font-bold">報價總覽</div>
+<div className="text-xs opacity-60 mt-1">確認後可儲存或列印</div>
+</div>
+
+<div className="bg-white rounded-2xl p-4 border border-stone-100">
+<div className="text-xs text-stone-400 mb-3 font-medium">報價資訊</div>
+{[["客戶",quoteInfo.client],["專案",quoteInfo.projectName],["日期",quoteInfo.date],["坪數",quoteInfo.size?`${quoteInfo.size} 坪`:""],["風格",quoteInfo.style]].filter(([,v])=>v).map(([l,v])=>(
+<div key={l} className="flex justify-between text-sm mb-1"><span className="text-stone-400">{l}</span><span className="text-stone-700">{v}</span></div>
+))}
+</div>
+
+<div className="bg-white rounded-2xl border border-stone-100 overflow-hidden">
+<div className="grid grid-cols-12 text-xs text-stone-400 px-3 py-2 bg-stone-50 font-medium">
+<div className="col-span-6">項目</div><div className="col-span-2 text-center">數量</div><div className="col-span-2 text-center">單位</div><div className="col-span-2 text-right">小計</div>
+</div>
+{lineItems.filter(i=>i.enabled&&Number(i.qty)>0).map(item=>(
+<div key={item.id} className="grid grid-cols-12 text-xs px-3 py-2 border-t border-stone-50">
+<div className="col-span-6 text-stone-700">{item.name}</div>
+<div className="col-span-2 text-center text-stone-500">{item.qty}</div>
+<div className="col-span-2 text-center text-stone-400">{item.unit}</div>
+<div className="col-span-2 text-right text-stone-700">{(Number(item.qty)*Number(item.price)).toLocaleString()}</div>
+</div>
+))}
+</div>
+
+<div className="bg-white rounded-2xl p-4 border border-stone-100 space-y-3">
+<div className="flex justify-between items-center">
+<span className="text-sm text-stone-400">工程小計</span>
+<span className="text-sm font-medium">NT${subtotal.toLocaleString()}</span>
+</div>
+<div className="flex items-center gap-3">
+<span className="text-sm text-stone-400 flex-shrink-0">折扣</span>
+<input type="number" min="0" max="50" className="w-16 border border-stone-200 rounded-lg px-2 py-1 text-sm text-center" value={quoteInfo.discount} onChange={e=>setQuoteInfo({...quoteInfo,discount:e.target.value})}/>
+<span className="text-sm text-stone-400">%</span>
+{discountAmt>0&&<span className="text-sm text-red-500 ml-auto">-NT${discountAmt.toLocaleString()}</span>}
+</div>
+<div className="flex items-center gap-3">
+<span className="text-sm text-stone-400 flex-shrink-0">稅金</span>
+<input type="number" min="0" max="20" className="w-16 border border-stone-200 rounded-lg px-2 py-1 text-sm text-center" value={quoteInfo.taxRate} onChange={e=>setQuoteInfo({...quoteInfo,taxRate:e.target.value})}/>
+<span className="text-sm text-stone-400">%</span>
+{taxAmt>0&&<span className="text-sm text-stone-500 ml-auto">+NT${taxAmt.toLocaleString()}</span>}
+</div>
+<div className="flex justify-between items-center pt-3 border-t border-stone-100">
+<span className="text-base font-bold text-stone-700">總計</span>
+<span className="text-xl font-bold text-stone-800">NT${total.toLocaleString()}</span>
+</div>
+</div>
+
+<Txt label="備註說明" placeholder="例：此為初步估價，實際費用依現場丈量為準，報價有效期限30天" value={quoteInfo.note} onChange={e=>setQuoteInfo({...quoteInfo,note:e.target.value})}/>
+
+<div className="flex gap-2">
+<button onClick={()=>setStep(3)} className="flex-1 bg-stone-100 text-stone-600 rounded-xl py-3 text-sm">← 返回</button>
+<button onClick={saveQuote} className="flex-1 bg-emerald-600 text-white rounded-xl py-3 text-sm font-medium">💾 儲存報價</button>
+</div>
+<button onClick={()=>window.print()} className="w-full bg-stone-800 text-white rounded-xl py-3 text-sm font-medium">🖨️ 列印 / PDF</button>
+<button onClick={resetQuote} className="w-full text-stone-400 text-sm py-2">重新開始</button>
+</div>
+)}
+</div>
+);
+}
+
+
 // ─── Clients ────────────────────────────────────────────────────
 function Clients({ items, setItems }) {
 const [modal, setModal] = useState(false);
@@ -1824,6 +2241,7 @@ const [tracking, setTracking] = useLocalStorage("tracking", []);
 const [losses, setLosses] = useLocalStorage("losses", []);
 const [appointments, setAppointments] = useLocalStorage("appointments", []);
 const [clients, setClients] = useLocalStorage("clients", []);
+const [quickquotes, setQuickquotes] = useLocalStorage("quickquotes", []);
 const [schedule, setSchedule] = useLocalStorage("schedule", []);
 const [album, setAlbum] = useLocalStorage("album", []);
 const [companyInfo, setCompanyInfo] = useLocalStorage("companyInfo", {});
@@ -1837,7 +2255,7 @@ const clearAll=()=>{
 ["tasks","projects","inquiries","contracts","quotes","inspection","acceptance","pending",
 "knowledge","lighting","design","ledger","purchase","expense","payroll","monthly",
 "attendance","leave","overtime","materials","inventory","tracking","losses","appointments",
-"companyInfo","notifSettings","dismissed_notifs","menuCustom","clients","schedule","album"
+"companyInfo","notifSettings","dismissed_notifs","menuCustom","clients","schedule","album","quickquotes"
 ].forEach(k=>localStorage.removeItem(k));
 window.location.reload();
 };
@@ -1849,6 +2267,7 @@ switch(activeId){
 case "dashboard": return <Dashboard tasks={tasks} projects={projects} attendance={attendance} setActiveId={setActiveId}/>;
 case "tasks": return <Tasks tasks={tasks} setTasks={setTasks}/>;
 case "calendar": return <Calendar tasks={tasks}/>;
+case "quickquote": return <QuickQuote items={quickquotes} setItems={setQuickquotes}/>;
 case "clients": return <Clients items={clients} setItems={setClients}/>;
 case "schedule": return <Schedule items={schedule} setItems={setSchedule} projects={projects}/>;
 case "album": return <Album items={album} setItems={setAlbum}/>;
