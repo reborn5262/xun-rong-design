@@ -1,48 +1,38 @@
 import { useState, useEffect } from "react";
 
+
 // ─── Supabase Client ─────────────────────────────────────────────
 const SUPABASE_URL = "https://yzdglmopwhjgknusjchn.supabase.co";
-const SUPABASE_KEY = "eyJhbGci0iJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6ZGdsbW9wd2hqZ2tudXNqY2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkxMzQ5NDUsImV4cCI6MjA2NDcxMDk0NX0.eyJhbGci0iJIUzI1NiIsInR5cCI6IkpXVCJ9";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6ZGdsbW9wd2hqZ2tudXNqY2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwODEwNzUsImV4cCI6MjA5NjY1NzA3NX0.Tuc-Ee0cgocjhJUyV1Qey8D8Qj5LG9gJqNAkXzPn95g";
+
+const HEADERS = {
+"apikey": SUPABASE_KEY,
+"Authorization": `Bearer ${SUPABASE_KEY}`,
+"Content-Type": "application/json",
+"Prefer": "return=minimal"
+};
 
 const sb = {
 async getAll(table) {
-const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*&order=created_at.desc`, {
-headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*&order=id.asc`, {
+headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
 });
+if (!res.ok) return [];
 const rows = await res.json();
-return rows.map(r => r.data);
-},
-async insert(table, data) {
-await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
-method: "POST",
-headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
-body: JSON.stringify({ data })
-});
-},
-async update(table, id, data) {
-await fetch(`${SUPABASE_URL}/rest/v1/${table}?data->>id=eq.${id}`, {
-method: "PATCH",
-headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" },
-body: JSON.stringify({ data })
-});
-},
-async delete(table, id) {
-await fetch(`${SUPABASE_URL}/rest/v1/${table}?data->>id=eq.${id}`, {
-method: "DELETE",
-headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
-});
+return rows.map(r => r.data).filter(Boolean);
 },
 async replaceAll(table, items) {
-// Delete all then insert all - simplest sync approach
-await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=gte.0`, {
+// Delete all existing rows
+await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=gt.0`, {
 method: "DELETE",
-headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+headers: HEADERS
 });
+// Insert new rows
 if (items.length > 0) {
 const rows = items.map(data => ({ data }));
 await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
 method: "POST",
-headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+headers: HEADERS,
 body: JSON.stringify(rows)
 });
 }
@@ -64,34 +54,54 @@ schedule:"schedule", album:"album"
 
 function useCloudSync(key, defaultValue) {
 const tableName = TABLE_MAP[key];
-const [value, setValue] = useState(defaultValue);
-const [synced, setSynced] = useState(false);
+const [value, setValue] = useState(() => {
+try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : defaultValue; }
+catch { return defaultValue; }
+});
+const [loaded, setLoaded] = useState(false);
+const saveTimer = useState({})[0];
 
 // Load from cloud on mount
 useEffect(() => {
-if (!tableName) return;
+if (!tableName) { setLoaded(true); return; }
 sb.getAll(tableName).then(rows => {
-if (rows && rows.length > 0) setValue(rows.filter(Boolean));
-setSynced(true);
-}).catch(() => setSynced(true));
-}, [tableName]);
-
-// Save to cloud when value changes (after initial sync)
-useEffect(() => {
-if (!synced || !tableName) return;
-const t = setTimeout(() => {
-sb.replaceAll(tableName, value).catch(console.error);
-}, 1000); // debounce 1 second
-return () => clearTimeout(t);
-}, [value, synced, tableName]);
-
-// Also keep localStorage as fallback
-useEffect(() => {
-try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
-}, [key, value]);
-
-return [value, setValue];
+if (rows && rows.length > 0) {
+setValue(rows);
+localStorage.setItem(key, JSON.stringify(rows));
 }
+setLoaded(true);
+}).catch(() => setLoaded(true));
+}, []);
+
+// Auto-refresh every 30 seconds to get updates from other devices
+useEffect(() => {
+if (!tableName) return;
+const interval = setInterval(() => {
+sb.getAll(tableName).then(rows => {
+if (rows && rows.length >= 0) {
+setValue(rows);
+localStorage.setItem(key, JSON.stringify(rows));
+}
+}).catch(() => {});
+}, 30000);
+return () => clearInterval(interval);
+}, []);
+
+// Debounced save to cloud when value changes
+const setValueAndSync = (newVal) => {
+const v = typeof newVal === "function" ? newVal(value) : newVal;
+setValue(v);
+localStorage.setItem(key, JSON.stringify(v));
+if (!tableName || !loaded) return;
+clearTimeout(saveTimer[key]);
+saveTimer[key] = setTimeout(() => {
+sb.replaceAll(tableName, v).catch(console.error);
+}, 800);
+};
+
+return [value, setValueAndSync];
+}
+
 
 
 
@@ -111,17 +121,11 @@ const NAV_SECTIONS = [
 { icon: "📅", label: "行事曆", id: "calendar" },
 { icon: "📋", label: "預約總覽", id: "appointments" },
 ]},
-{ label: "客戶與排程", items: [
-{ icon: "👥", label: "客戶管理", id: "clients" },
-{ icon: "🗓", label: "智慧排程", id: "schedule" },
-]},
 { label: "專案管理", items: [
 { icon: "📝", label: "諮詢單管理", id: "inquiries" },
 { icon: "🏠", label: "專案總覽", id: "projects" },
-{ icon: "📸", label: "專案相簿", id: "album" },
 { icon: "📄", label: "合約管理", id: "contracts" },
 { icon: "💰", label: "報價單", id: "quotes" },
-{ icon: "📋", label: "初步報價", id: "quickquote" },
 { icon: "🔍", label: "工程檢核", id: "inspection" },
 { icon: "✅", label: "工程驗收", id: "acceptance" },
 { icon: "👤", label: "待客戶確認", id: "pending" },
@@ -131,7 +135,6 @@ const NAV_SECTIONS = [
 { icon: "💡", label: "燈光設計", id: "lighting" },
 { icon: "🖥", label: "設計提案", id: "design" },
 { icon: "⊞", label: "磁磚計算", id: "tiles" },
-{ icon: "📄", label: "報表輸出", id: "reports" },
 ]},
 { label: "財務管理", items: [
 { icon: "📒", label: "公司帳本", id: "ledger" },
@@ -160,13 +163,7 @@ const NAV_SECTIONS = [
 ]},
 ];
 
-function getProjectList() {
-try {
-const p = JSON.parse(localStorage.getItem("projects") || "[]");
-const names = p.map(x => x.name).filter(Boolean);
-return [...new Set([...names, "公司內部"])];
-} catch { return ["公司內部"]; }
-}
+const PROJECT_LIST = ["台北大安區 林宅","信義區 陳宅翻修","中山區 王宅","松山區 商辦空間","內湖 科技公司","公司內部"];
 const SC = { "施工中":"blue","設計中":"yellow","驗收中":"green","報價中":"gray","完工":"green","待審":"yellow","已核准":"green","已拒絕":"red","進行中":"blue","已完成":"green","草稿":"gray","確認中":"blue","已確認":"green","取消":"red" };
 
 function Badge({ color, children }) {
@@ -237,6 +234,7 @@ return (
 </div>
 );
 }
+
 function Dashboard({ tasks, projects, attendance, setActiveId }) {
 const pending = tasks.filter(t=>!t.done);
 const todayStr = new Date().toLocaleDateString("zh-TW");
@@ -351,7 +349,7 @@ return (
 <Modal title={edit?"編輯任務":"新增任務"} onClose={()=>setModal(false)}>
 <div className="space-y-3">
 <Inp label="任務名稱 *" placeholder="輸入任務名稱" value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/>
-<Sel label="所屬專案" options={["",...getProjectList()]} value={form.project} onChange={e=>setForm({...form,project:e.target.value})}/>
+<Sel label="所屬專案" options={["",...PROJECT_LIST]} value={form.project} onChange={e=>setForm({...form,project:e.target.value})}/>
 <div className="grid grid-cols-2 gap-3">
 <Sel label="優先度" options={["高","中","低"]} value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})}/>
 <Inp label="截止日期" type="date" value={form.due} onChange={e=>setForm({...form,due:e.target.value})}/>
@@ -415,6 +413,7 @@ return(
 </div>
 );
 }
+
 function mkPage(fields, addLabel, renderItem) {
 return function Page({ items, setItems }) {
 const [modal, setModal] = useState(false);
@@ -458,7 +457,7 @@ const Appointments = mkPage([
 {key:"date",label:"日期",inputType:"date"},{key:"time",label:"時間",inputType:"time"}
 ]},
 {key:"location",label:"地點"},
-{key:"project",label:"所屬專案",type:"select",options:["",...getProjectList()]},
+{key:"project",label:"所屬專案",type:"select",options:["",...PROJECT_LIST]},
 {key:"status",label:"狀態",type:"select",options:["確認中","已確認","已完成","取消"],default:"確認中"},
 {key:"note",label:"備註",type:"textarea"},
 ],"預約",i=>(
@@ -501,7 +500,7 @@ renderItem={i=>(
 <Sel label="類型" options={["現場勘查","設計討論","簽約","驗收","其他"]} value={form.type} onChange={e=>setForm({...form,type:e.target.value})}/>
 <div className="grid grid-cols-2 gap-3"><Inp label="日期" type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/><Inp label="時間" type="time" value={form.time} onChange={e=>setForm({...form,time:e.target.value})}/></div>
 <Inp label="地點" value={form.location} onChange={e=>setForm({...form,location:e.target.value})}/>
-<Sel label="所屬專案" options={["",...getProjectList()]} value={form.project} onChange={e=>setForm({...form,project:e.target.value})}/>
+<Sel label="所屬專案" options={["",...PROJECT_LIST]} value={form.project} onChange={e=>setForm({...form,project:e.target.value})}/>
 <Sel label="狀態" options={["確認中","已確認","已完成","取消"]} value={form.status} onChange={e=>setForm({...form,status:e.target.value})}/>
 <Txt label="備註" value={form.note} onChange={e=>setForm({...form,note:e.target.value})}/>
 </div>
@@ -555,6 +554,7 @@ renderItem={p=>(
 </>
 );
 }
+
 function SimpleForm({ title, fields, items, setItems, addLabel, renderItem }) {
 const [modal, setModal] = useState(false);
 const [edit, setEdit] = useState(null);
@@ -613,7 +613,7 @@ renderItem={i=>(
 function Contracts({ items, setItems }) {
 return <SimpleForm addLabel="新增合約" items={items} setItems={setItems}
 fields={[
-{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...getProjectList()]},
+{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...PROJECT_LIST]},
 {key:"client",label:"客戶"},{key:"amount",label:"合約金額",ph:"NT$"},
 {key:"signDate",label:"簽約日期",it:"date"},
 {grid:2,children:[{key:"startDate",label:"開工日期",it:"date"},{key:"endDate",label:"完工日期",it:"date"}]},
@@ -634,7 +634,7 @@ renderItem={i=>(
 function Quotes({ items, setItems }) {
 return <SimpleForm addLabel="新增報價" items={items} setItems={setItems}
 fields={[
-{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...getProjectList()]},
+{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...PROJECT_LIST]},
 {key:"client",label:"客戶"},{key:"total",label:"報價總額",ph:"NT$"},
 {grid:2,children:[{key:"date",label:"報價日期",it:"date"},{key:"validUntil",label:"有效期限",it:"date"}]},
 {key:"status",label:"狀態",type:"sel",opts:["草稿","已送出","已核准","已拒絕"],default:"草稿"},
@@ -655,7 +655,7 @@ renderItem={i=>(
 function Inspection({ items, setItems }) {
 return <SimpleForm addLabel="新增檢核" items={items} setItems={setItems}
 fields={[
-{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...getProjectList()]},
+{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...PROJECT_LIST]},
 {grid:2,children:[{key:"type",label:"工種",type:"sel",opts:["木作","泥作","水電","油漆","鐵件","其他"]},{key:"inspector",label:"檢核人員"}]},
 {key:"date",label:"檢核日期",it:"date"},
 {key:"result",label:"結果",type:"sel",opts:["待審","通過","不通過","待改善"],default:"待審"},
@@ -676,7 +676,7 @@ renderItem={i=>(
 function Acceptance({ items, setItems }) {
 return <SimpleForm addLabel="新增驗收" items={items} setItems={setItems}
 fields={[
-{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...getProjectList()]},
+{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...PROJECT_LIST]},
 {key:"client",label:"客戶"},{key:"date",label:"驗收日期",it:"date"},
 {key:"status",label:"狀態",type:"sel",opts:["待驗收","已完成","有缺失"],default:"待驗收"},
 {key:"items_checked",label:"驗收項目",type:"txt",ph:"列出驗收項目"},
@@ -697,7 +697,7 @@ renderItem={i=>(
 function Pending({ items, setItems }) {
 return <SimpleForm addLabel="新增待確認" items={items} setItems={setItems}
 fields={[
-{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...getProjectList()]},
+{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...PROJECT_LIST]},
 {key:"client",label:"客戶"},
 {key:"type",label:"類型",type:"sel",opts:["設計確認","材料確認","報價確認","合約確認","其他"]},
 {key:"deadline",label:"截止日期",it:"date"},
@@ -742,6 +742,7 @@ renderItem={i=>(
 </>
 );
 }
+
 function TilesCalc() {
 const [room, setRoom] = useState({l:"",w:""});
 const [tile, setTile] = useState({l:"30",w:"30"});
@@ -791,7 +792,7 @@ return(
 function Lighting({ items, setItems }) {
 return <SimpleForm addLabel="新增燈具" items={items} setItems={setItems}
 fields={[
-{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...getProjectList()]},
+{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...PROJECT_LIST]},
 {grid:2,children:[{key:"room",label:"空間",type:"sel",opts:["客廳","臥室","廚房","浴室","走廊","書房","餐廳","其他"]},{key:"type",label:"燈具類型",type:"sel",opts:["主燈","嵌燈","吊燈","壁燈","夜燈","軌道燈","其他"]}]},
 {key:"brand",label:"品牌"},
 {grid:3,children:[{key:"watt",label:"瓦數W",it:"number"},{key:"colorTemp",label:"色溫",type:"sel",opts:["2700K","3000K","4000K","5000K","6500K"]},{key:"qty",label:"數量",it:"number"}]},
@@ -812,7 +813,7 @@ renderItem={i=>(
 function Design({ items, setItems }) {
 return <SimpleForm addLabel="新增提案" items={items} setItems={setItems}
 fields={[
-{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...getProjectList()]},
+{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...PROJECT_LIST]},
 {key:"name",label:"提案名稱"},
 {key:"style",label:"風格",type:"sel",opts:["現代風","北歐風","工業風","日式風","古典風","混搭風","其他"]},
 {key:"budget",label:"設計預算",ph:"NT$"},
@@ -868,7 +869,7 @@ renderItem={i=>(
 <Inp label="金額 *" type="number" placeholder="0" value={form.amount} onChange={e=>setForm({...form,amount:e.target.value})}/>
 </div>
 <Sel label="類別" options={["工程款","設計費","材料費","人工費","管銷費","其他"]} value={form.category} onChange={e=>setForm({...form,category:e.target.value})}/>
-<Sel label="所屬專案" options={["",...getProjectList()]} value={form.project} onChange={e=>setForm({...form,project:e.target.value})}/>
+<Sel label="所屬專案" options={["",...PROJECT_LIST]} value={form.project} onChange={e=>setForm({...form,project:e.target.value})}/>
 <Inp label="日期" type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/>
 <Txt label="備註" value={form.note} onChange={e=>setForm({...form,note:e.target.value})}/>
 </div>
@@ -877,11 +878,12 @@ renderItem={i=>(
 </>
 );
 }
+
 function Purchase({ items, setItems }) {
 return <SimpleForm addLabel="新增採購" items={items} setItems={setItems}
 fields={[
 {key:"item",label:"採購品項 *",req:true},
-{key:"project",label:"所屬專案",type:"sel",opts:["",...getProjectList()]},
+{key:"project",label:"所屬專案",type:"sel",opts:["",...PROJECT_LIST]},
 {grid:3,children:[{key:"qty",label:"數量",it:"number"},{key:"unit",label:"單位",ph:"個/箱/片"},{key:"price",label:"單價",it:"number"}]},
 {key:"supplier",label:"供應商"},
 {key:"date",label:"需求日期",it:"date"},
@@ -905,7 +907,7 @@ fields={[
 {key:"category",label:"費用類別",type:"sel",opts:["交通費","餐費","住宿費","材料費","工具費","其他"]},
 {key:"amount",label:"金額 *",req:true,it:"number"},
 {key:"date",label:"費用日期",it:"date"},
-{key:"project",label:"所屬專案",type:"sel",opts:["",...getProjectList()]},
+{key:"project",label:"所屬專案",type:"sel",opts:["",...PROJECT_LIST]},
 {key:"status",label:"狀態",type:"sel",opts:["待審","已核准","已拒絕","已撥款"],default:"待審"},
 {key:"note",label:"說明",type:"txt"},
 ]}
@@ -1050,6 +1052,7 @@ return(
 </div>
 );
 }
+
 function Leave({ items, setItems }) {
 return <SimpleForm addLabel="新增請假" items={items} setItems={setItems}
 fields={[
@@ -1076,7 +1079,7 @@ fields={[
 {key:"name",label:"員工姓名 *",req:true},
 {key:"date",label:"加班日期",it:"date"},
 {grid:3,children:[{key:"startTime",label:"開始",it:"time"},{key:"endTime",label:"結束",it:"time"},{key:"hours",label:"時數",it:"number"}]},
-{key:"project",label:"所屬專案",type:"sel",opts:["",...getProjectList()]},
+{key:"project",label:"所屬專案",type:"sel",opts:["",...PROJECT_LIST]},
 {key:"reason",label:"加班原因",type:"txt"},
 {key:"status",label:"狀態",type:"sel",opts:["待審","已核准","已拒絕"],default:"待審"},
 ]}
@@ -1138,7 +1141,7 @@ function Tracking({ items, setItems }) {
 return <SimpleForm addLabel="新增備料" items={items} setItems={setItems}
 fields={[
 {key:"material",label:"材料名稱 *",req:true},
-{key:"project",label:"所屬專案",type:"sel",opts:["",...getProjectList()]},
+{key:"project",label:"所屬專案",type:"sel",opts:["",...PROJECT_LIST]},
 {grid:2,children:[{key:"qty",label:"數量"},{key:"unit",label:"單位"}]},
 {key:"needDate",label:"需求日期",it:"date"},
 {key:"supplier",label:"供應商"},
@@ -1156,7 +1159,7 @@ renderItem={i=>(
 }
 
 function Profit({ ledger, projects }) {
-const byProject=getProjectList().map(name=>{
+const byProject=PROJECT_LIST.map(name=>{
 const inc=ledger.filter(i=>i.project===name&&i.type==="收入").reduce((s,i)=>s+Number(i.amount||0),0);
 const exp=ledger.filter(i=>i.project===name&&i.type==="支出").reduce((s,i)=>s+Number(i.amount||0),0);
 return{name,income:inc,expense:exp,profit:inc-exp};
@@ -1188,7 +1191,7 @@ return(
 </div>
 <SimpleForm addLabel="新增損失" items={items} setItems={setItems}
 fields={[
-{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...getProjectList()]},
+{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...PROJECT_LIST]},
 {key:"type",label:"損失類型",type:"sel",opts:["材料損耗","工程返工","設備損壞","人工浪費","其他"]},
 {key:"amount",label:"損失金額",it:"number",ph:"NT$"},
 {key:"date",label:"發生日期",it:"date"},
@@ -1207,35 +1210,16 @@ renderItem={i=>(
 );
 }
 
-function SettingsSection({ title, icon, children, defaultOpen=false }) {
-const [open, setOpen] = useState(defaultOpen);
-return (
-<div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
-<button onClick={()=>setOpen(!open)} className="w-full flex items-center justify-between px-4 py-3.5">
-<div className="flex items-center gap-2">
-<span className="text-base">{icon}</span>
-<span className="text-sm font-semibold text-stone-700">{title}</span>
-</div>
-<span className={`text-stone-400 text-xs transition-transform ${open?"rotate-180":""}`}>▼</span>
-</button>
-{open && <div className="px-4 pb-4 border-t border-stone-50">{children}</div>}
-</div>
-);
-}
-
-function Settings({ onClearAll, companyInfo, setCompanyInfo, notifSettings, setNotifSettings, menuCustom, setMenuCustom, appPassword, setAppPassword }) {
+function Settings({ onClearAll, appPassword, setAppPassword, companyInfo, setCompanyInfo, notifSettings, setNotifSettings, menuCustom, setMenuCustom }) {
 const [confirm, setConfirm] = useState(false);
-const [company, setCompany] = useState(companyInfo || {name:"",phone:"",address:"",taxId:"",bank:"",bankAccount:""});
-const [notif, setNotif] = useState(notifSettings || {taskOverdue:true,taskDueToday:true,lowInventory:true,pendingApproval:true,quoteExpiry:true,projectNoUpdate:true});
 const [pwForm, setPwForm] = useState({current:"",newPw:"",confirm:""});
 const [pwError, setPwError] = useState("");
 const [pwSuccess, setPwSuccess] = useState(false);
-
-const saveCompany = () => { setCompanyInfo(company); alert("✅ 公司資料已儲存"); };
-const saveNotif = () => { setNotifSettings(notif); alert("✅ 通知設定已儲存"); };
+const [company, setCompany] = useState(companyInfo || {name:"",phone:"",address:"",taxId:"",bank:"",bankAccount:""});
+const [notif, setNotif] = useState(notifSettings || {taskOverdue:true,taskDueToday:true,lowInventory:true,pendingApproval:true,quoteExpiry:true,projectNoUpdate:true});
 
 const changePassword = () => {
-if (pwForm.current !== appPassword) { setPwError("目前密碼錯誤"); return; }
+if (pwForm.current !== (appPassword||"1234")) { setPwError("目前密碼錯誤"); return; }
 if (pwForm.newPw.length < 4) { setPwError("新密碼至少需要 4 位"); return; }
 if (pwForm.newPw !== pwForm.confirm) { setPwError("兩次密碼不一致"); return; }
 setAppPassword(pwForm.newPw);
@@ -1244,26 +1228,22 @@ setPwError("");
 setPwSuccess(true);
 setTimeout(() => setPwSuccess(false), 2000);
 };
-
+const saveCompany = () => { setCompanyInfo(company); alert("✅ 公司資料已儲存"); };
+const saveNotif = () => { setNotifSettings(notif); alert("✅ 通知設定已儲存"); };
 
 return(
 <div className="space-y-3">
 
-{/* Password Management */}
+{/* Password */}
 <SettingsSection title="密碼與權限管理" icon="🔐" defaultOpen={true}>
 <div className="mt-3 space-y-3">
-<div className="bg-stone-50 rounded-xl p-3 text-xs text-stone-500 space-y-1">
+<div className="bg-stone-50 rounded-xl p-3 text-xs text-stone-500">
 <div className="font-medium text-stone-600 mb-2">🔒 以下功能需密碼存取：</div>
 {Object.entries(PROTECTED_PAGES).map(([id,p])=>(
-<div key={id} className="flex items-center gap-2">
-<span>{p.icon}</span><span>{p.label}</span>
-</div>
+<div key={id} className="flex items-center gap-2 mb-1"><span>{p.icon}</span><span>{p.label}</span></div>
 ))}
 </div>
-<div className="text-xs text-stone-400 font-medium mt-2">更改密碼</div>
-<div className="relative">
 <input type="password" className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm" placeholder="目前密碼" value={pwForm.current} onChange={e=>setPwForm({...pwForm,current:e.target.value})}/>
-</div>
 <input type="password" className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm" placeholder="新密碼（至少4位）" value={pwForm.newPw} onChange={e=>setPwForm({...pwForm,newPw:e.target.value})}/>
 <input type="password" className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm" placeholder="確認新密碼" value={pwForm.confirm} onChange={e=>setPwForm({...pwForm,confirm:e.target.value})}/>
 {pwError && <div className="text-xs text-red-500 text-center">{pwError}</div>}
@@ -1274,7 +1254,7 @@ return(
 </SettingsSection>
 
 {/* Company Info */}
-<SettingsSection title="公司基本資料" icon="🏢" defaultOpen={true}>
+<SettingsSection title="公司基本資料" icon="🏢">
 <div className="space-y-3 mt-3">
 <Inp label="公司名稱" placeholder="請輸入公司名稱" value={company.name} onChange={e=>setCompany({...company,name:e.target.value})}/>
 <Inp label="聯絡電話" placeholder="02-XXXX-XXXX" value={company.phone} onChange={e=>setCompany({...company,phone:e.target.value})}/>
@@ -1321,7 +1301,7 @@ return (
 className="w-10 border border-stone-200 rounded-lg px-1 py-1.5 text-center text-sm focus:outline-none"
 placeholder="圖"
 value={custom.icon !== undefined ? custom.icon : item.icon}
-onChange={e=>setMenuCustom(prev=>({...prev,[item.id]:{...( prev[item.id]||{}),icon:e.target.value}}))}
+onChange={e=>setMenuCustom(prev=>({...prev,[item.id]:{...(prev[item.id]||{}),icon:e.target.value}}))}
 />
 <input
 className="flex-1 border border-stone-200 rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:border-stone-400"
@@ -1334,30 +1314,7 @@ onChange={e=>setMenuCustom(prev=>({...prev,[item.id]:{...(prev[item.id]||{}),lab
 </div>
 );
 })}
-<button onClick={()=>alert("✅ 選單名稱已儲存")} className="w-full bg-stone-800 text-white rounded-xl py-2.5 text-sm font-medium mt-2">套用變更</button>
-</div>
-</SettingsSection>
-
-{/* Project Status Options */}
-<SettingsSection title="專案狀態選項" icon="🏠">
-<div className="mt-3 space-y-1">
-{["設計中","報價中","施工中","驗收中","完工"].map(s=>(
-<div key={s} className="flex items-center gap-2 px-3 py-2 bg-stone-50 rounded-xl">
-<span className="text-xs font-medium text-stone-600">{s}</span>
-</div>
-))}
-<div className="text-xs text-stone-400 mt-2">* 狀態選項為系統預設，如需自訂請聯繫開發者</div>
-</div>
-</SettingsSection>
-
-{/* Priority Options */}
-<SettingsSection title="任務優先度" icon="📋">
-<div className="mt-3 space-y-1">
-{[["高","bg-red-100 text-red-700"],["中","bg-yellow-100 text-yellow-700"],["低","bg-green-100 text-green-700"]].map(([p,c])=>(
-<div key={p} className="flex items-center gap-2 px-3 py-2 bg-stone-50 rounded-xl">
-<span className={`text-xs font-medium px-2 py-0.5 rounded-full ${c}`}>{p}</span>
-</div>
-))}
+<div className="text-xs text-stone-400 mt-2 text-center">修改後即時套用到選單</div>
 </div>
 </SettingsSection>
 
@@ -1365,18 +1322,16 @@ onChange={e=>setMenuCustom(prev=>({...prev,[item.id]:{...(prev[item.id]||{}),lab
 <SettingsSection title="關於系統" icon="ℹ️">
 <div className="mt-3 text-xs text-stone-400 space-y-1.5">
 <div className="flex justify-between"><span>版本</span><span>1.0.0</span></div>
-<div className="flex justify-between"><span>資料儲存</span><span>瀏覽器本機</span></div>
+<div className="flex justify-between"><span>資料儲存</span><span>Supabase 雲端</span></div>
+<div className="flex justify-between"><span>自動同步</span><span>每30秒</span></div>
 <div className="flex justify-between"><span>建議瀏覽器</span><span>Safari / Chrome</span></div>
-<div className="mt-2 text-stone-300 text-center text-xs">所有資料儲存在您的裝置上</div>
 </div>
 </SettingsSection>
 
 {/* Data Management */}
 <SettingsSection title="資料管理" icon="🗄️">
 <div className="mt-3 space-y-2">
-<div className="bg-stone-50 rounded-xl p-3 text-xs text-stone-400">
-⚠️ 清除資料後無法復原，請謹慎操作。建議先截圖備份重要資料。
-</div>
+<div className="bg-stone-50 rounded-xl p-3 text-xs text-stone-400">⚠️ 清除資料後無法復原，請謹慎操作。</div>
 <button onClick={()=>setConfirm(true)} className="w-full bg-red-50 text-red-500 rounded-xl py-3 text-sm font-medium">🗑 清除所有資料</button>
 </div>
 </SettingsSection>
@@ -1398,76 +1353,6 @@ onChange={e=>setMenuCustom(prev=>({...prev,[item.id]:{...(prev[item.id]||{}),lab
 );
 }
 
-
-
-// ─── Quick Quote System ─────────────────────────────────────────
-const QUOTE_TEMPLATES = {
-living: { label:"客廳", icon:"🛋️", items:[
-{name:"拆除工程",unit:"式",qty:1,price:15000},
-{name:"輕隔間工程",unit:"才",qty:0,price:350},
-{name:"木作天花板",unit:"才",qty:0,price:450},
-{name:"木作電視牆",unit:"式",qty:1,price:45000},
-{name:"木作展示櫃",unit:"尺",qty:0,price:6500},
-{name:"油漆工程",unit:"才",qty:0,price:120},
-{name:"地板鋪設（超耐磨）",unit:"才",qty:0,price:280},
-{name:"燈具安裝",unit:"式",qty:1,price:8000},
-{name:"窗簾安裝",unit:"式",qty:1,price:12000},
-]},
-bedroom: { label:"臥室", icon:"🛏️", items:[
-{name:"拆除工程",unit:"式",qty:1,price:8000},
-{name:"木作天花板",unit:"才",qty:0,price:450},
-{name:"系統衣櫃",unit:"尺",qty:0,price:7500},
-{name:"床頭背板",unit:"式",qty:1,price:25000},
-{name:"油漆工程",unit:"才",qty:0,price:120},
-{name:"地板鋪設（超耐磨）",unit:"才",qty:0,price:280},
-{name:"燈具安裝",unit:"式",qty:1,price:5000},
-{name:"窗簾安裝",unit:"式",qty:1,price:8000},
-]},
-kitchen: { label:"廚房", icon:"🍳", items:[
-{name:"拆除工程",unit:"式",qty:1,price:20000},
-{name:"水電配管",unit:"式",qty:1,price:35000},
-{name:"廚具（上下櫃）",unit:"尺",qty:0,price:12000},
-{name:"磁磚工程",unit:"才",qty:0,price:380},
-{name:"油煙機安裝",unit:"式",qty:1,price:5000},
-{name:"廚房門施作",unit:"式",qty:1,price:15000},
-]},
-bathroom: { label:"浴室", icon:"🚿", items:[
-{name:"拆除工程",unit:"式",qty:1,price:18000},
-{name:"防水工程",unit:"才",qty:0,price:350},
-{name:"磁磚工程",unit:"才",qty:0,price:420},
-{name:"衛浴設備",unit:"式",qty:1,price:45000},
-{name:"水電配管",unit:"式",qty:1,price:25000},
-{name:"乾濕分離",unit:"式",qty:1,price:18000},
-{name:"浴室門施作",unit:"式",qty:1,price:12000},
-]},
-dining: { label:"餐廳", icon:"🍽️", items:[
-{name:"木作酒櫃/餐邊櫃",unit:"尺",qty:0,price:6500},
-{name:"油漆工程",unit:"才",qty:0,price:120},
-{name:"地板鋪設",unit:"才",qty:0,price:280},
-{name:"燈具安裝",unit:"式",qty:1,price:6000},
-{name:"壁紙/牆面造型",unit:"式",qty:1,price:15000},
-]},
-study: { label:"書房", icon:"📚", items:[
-{name:"系統書櫃",unit:"尺",qty:0,price:7000},
-{name:"書桌訂製",unit:"式",qty:1,price:20000},
-{name:"木作天花板",unit:"才",qty:0,price:450},
-{name:"油漆工程",unit:"才",qty:0,price:120},
-{name:"地板鋪設",unit:"才",qty:0,price:280},
-{name:"燈具安裝",unit:"式",qty:1,price:4000},
-]},
-};
-
-const EXTRA_ITEMS = [
-{name:"設計費",unit:"坪",qty:0,price:8000,category:"設計"},
-{name:"工程管理費",unit:"式",qty:1,price:30000,category:"管理"},
-{name:"清潔費",unit:"式",qty:1,price:8000,category:"雜項"},
-{name:"運費/搬運費",unit:"式",qty:1,price:5000,category:"雜項"},
-{name:"保護工程",unit:"式",qty:1,price:12000,category:"施工"},
-{name:"鋁窗更換",unit:"才",qty:0,price:650,category:"門窗"},
-{name:"冷氣安裝",unit:"台",qty:0,price:8000,category:"設備"},
-{name:"弱電工程",unit:"式",qty:1,price:20000,category:"水電"},
-{name:"地板架高",unit:"才",qty:0,price:180,category:"地板"},
-];
 
 function QuickQuote({ items: savedQuotes, setItems: setSavedQuotes }) {
 const [step, setStep] = useState(1); // 1=基本資訊, 2=選空間, 3=調整項目, 4=總覽
@@ -1813,6 +1698,7 @@ className={`rounded-2xl p-3 text-center border-2 transition-all ${selectedRooms[
 </div>
 );
 }
+
 
 
 // ─── Clients ────────────────────────────────────────────────────
@@ -2248,60 +2134,48 @@ return(
 }
 
 
+
+function getProjectList() {
+try {
+const p = JSON.parse(localStorage.getItem("projects") || "[]");
+const names = p.map(x => x.name).filter(Boolean);
+return [...new Set([...names, "公司內部"])];
+} catch { return ["公司內部"]; }
+}
+
+
 // ─── Notification System ─────────────────────────────────────────
 function useNotifications(tasks, projects, inventory, tracking, leave, overtime, acceptance, pending, quotes) {
 const today = new Date();
-const todayStr = today.toISOString().split("T")[0];
 const notes = [];
-
-// Overdue tasks
 tasks.filter(t => !t.done && t.due).forEach(t => {
 const due = new Date(t.due);
 if (due < today) notes.push({ type: "warning", category: "任務逾期", text: `「${t.title}」已逾期`, id: `task-${t.id}` });
 else if ((due - today) / 86400000 <= 1) notes.push({ type: "info", category: "任務提醒", text: `「${t.title}」今日截止`, id: `task-due-${t.id}` });
 });
-
-// Low inventory
 inventory.filter(i => Number(i.qty||0) <= Number(i.minQty||0)).forEach(i => {
-notes.push({ type: "warning", category: "庫存不足", text: `「${i.name}」庫存剩 ${i.qty} ${i.unit}，低於安全庫存`, id: `inv-${i.id}` });
+notes.push({ type: "warning", category: "庫存不足", text: `「${i.name}」庫存剩 ${i.qty} ${i.unit}`, id: `inv-${i.id}` });
 });
-
-// Delayed tracking
 tracking.filter(i => i.status === "延誤").forEach(i => {
 notes.push({ type: "warning", category: "備料延誤", text: `「${i.material}」備料延誤`, id: `track-${i.id}` });
 });
-
-// Pending leave/overtime awaiting approval
 leave.filter(i => i.status === "待審").forEach(i => {
-notes.push({ type: "info", category: "假單待審", text: `${i.name} 申請 ${i.type}（${i.days}天）待審核`, id: `leave-${i.id}` });
+notes.push({ type: "info", category: "假單待審", text: `${i.name} 申請 ${i.type} 待審核`, id: `leave-${i.id}` });
 });
 overtime.filter(i => i.status === "待審").forEach(i => {
 notes.push({ type: "info", category: "加班待審", text: `${i.name} 加班申請待審核`, id: `ot-${i.id}` });
 });
-
-// Pending acceptance
 acceptance.filter(i => i.status === "待驗收").forEach(i => {
 notes.push({ type: "info", category: "待驗收", text: `「${i.project}」等待驗收`, id: `acc-${i.id}` });
 });
-
-// Pending client confirmation
 pending.filter(i => i.status === "待確認").forEach(i => {
 notes.push({ type: "warning", category: "待客戶確認", text: `「${i.project}」${i.type}待客戶確認`, id: `pend-${i.id}` });
 });
-
-// Quotes expiring soon
 quotes.filter(i => i.validUntil && i.status !== "已核准").forEach(i => {
 const exp = new Date(i.validUntil);
 const diff = (exp - today) / 86400000;
 if (diff >= 0 && diff <= 3) notes.push({ type: "warning", category: "報價即將到期", text: `「${i.project}」報價 ${Math.ceil(diff)} 天後到期`, id: `quote-${i.id}` });
-else if (diff < 0) notes.push({ type: "warning", category: "報價已到期", text: `「${i.project}」報價已到期`, id: `quote-exp-${i.id}` });
 });
-
-// Projects with no progress update (progress = 0 and status is 施工中)
-projects.filter(p => p.status === "施工中" && (p.progress||0) === 0).forEach(p => {
-notes.push({ type: "info", category: "專案提醒", text: `「${p.name}」施工中但進度未更新`, id: `proj-${p.id}` });
-});
-
 return notes;
 }
 
@@ -2313,29 +2187,18 @@ return (
 <div className="absolute inset-0 bg-black/40" onClick={onClose}/>
 <div className="relative mt-16 bg-white rounded-t-3xl flex-1 overflow-y-auto shadow-2xl">
 <div className="sticky top-0 bg-white px-5 pt-5 pb-3 border-b border-stone-100 flex justify-between items-center">
-<div>
-<h2 className="text-base font-semibold text-stone-800">通知中心</h2>
-<div className="text-xs text-stone-400">{notifications.length} 則通知</div>
-</div>
+<div><h2 className="text-base font-semibold text-stone-800">通知中心</h2><div className="text-xs text-stone-400">{notifications.length} 則通知</div></div>
 <div className="flex gap-2">
 {notifications.length > 0 && <button onClick={onClearAll} className="text-xs text-red-400 px-3 py-1.5 rounded-lg bg-red-50">全部清除</button>}
 <button onClick={onClose} className="text-stone-400 text-xl w-8 h-8 flex items-center justify-center">✕</button>
 </div>
 </div>
 <div className="p-4 space-y-2">
-{notifications.length === 0 && (
-<div className="text-center py-16">
-<div className="text-4xl mb-3">🎉</div>
-<div className="text-stone-400 text-sm">目前沒有通知</div>
-</div>
-)}
+{notifications.length === 0 && <div className="text-center py-16"><div className="text-4xl mb-3">🎉</div><div className="text-stone-400 text-sm">目前沒有通知</div></div>}
 {notifications.map(n => (
 <div key={n.id} className={`flex items-start gap-3 rounded-xl px-4 py-3 text-sm border ${typeColor[n.type]}`}>
 <span className="flex-shrink-0 mt-0.5">{typeIcon[n.type]}</span>
-<div>
-<div className="font-medium text-xs mb-0.5">{n.category}</div>
-<div>{n.text}</div>
-</div>
+<div><div className="font-medium text-xs mb-0.5">{n.category}</div><div>{n.text}</div></div>
 </div>
 ))}
 </div>
@@ -2345,6 +2208,18 @@ return (
 );
 }
 
+function SettingsSection({ title, icon, children, defaultOpen=false }) {
+const [open, setOpen] = useState(defaultOpen);
+return (
+<div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
+<button onClick={()=>setOpen(!open)} className="w-full flex items-center justify-between px-4 py-3.5">
+<div className="flex items-center gap-2"><span className="text-base">{icon}</span><span className="text-sm font-semibold text-stone-700">{title}</span></div>
+<span className={`text-stone-400 text-xs ${open?"rotate-180":""}`}>▼</span>
+</button>
+{open && <div className="px-4 pb-4 border-t border-stone-50">{children}</div>}
+</div>
+);
+}
 
 // ─── Permission System ──────────────────────────────────────────
 const PROTECTED_PAGES = {
