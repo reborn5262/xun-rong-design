@@ -190,13 +190,13 @@ return (
 }
 
 function Inp({ label, ...p }) {
-return <div>{label&&<label className="text-xs text-stone-400 mb-1 block">{label}</label>}<input className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-stone-400" {...p}/></div>;
+return <div>{label&&<label className="text-xs text-stone-400 mb-1 block">{label}</label>}<input className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-stone-400" spellCheck={false} autoCorrect="off" autoCapitalize="off" {...p}/></div>;
 }
 function Sel({ label, options, ...p }) {
 return <div>{label&&<label className="text-xs text-stone-400 mb-1 block">{label}</label>}<select className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-stone-400 bg-white" {...p}>{options.map(o=><option key={o} value={o}>{o}</option>)}</select></div>;
 }
 function Txt({ label, ...p }) {
-return <div>{label&&<label className="text-xs text-stone-400 mb-1 block">{label}</label>}<textarea className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-stone-400 resize-none" rows={3} {...p}/></div>;
+return <div>{label&&<label className="text-xs text-stone-400 mb-1 block">{label}</label>}<textarea className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-stone-400 resize-none" rows={3} spellCheck={false} autoCorrect="off" {...p}/></div>;
 }
 function Btn({ onClick, label="儲存" }) {
 return <button onClick={onClick} className="w-full bg-stone-800 text-white rounded-xl py-3 mt-4 font-medium text-sm">{label}</button>;
