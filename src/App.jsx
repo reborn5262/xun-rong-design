@@ -1150,8 +1150,6 @@ setPwSuccess(true);
 setTimeout(() => setPwSuccess(false), 2000);
 };
 
-const saveCompany = () => { setCompanyInfo(company); alert("✅ 公司資料已儲存"); };
-const saveNotif = () => { setNotifSettings(notif); alert("✅ 通知設定已儲存"); };
 
 return(
 <div className="space-y-3">
