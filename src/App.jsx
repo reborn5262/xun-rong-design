@@ -1,5 +1,100 @@
 import { useState, useEffect } from "react";
 
+// ─── Supabase Client ─────────────────────────────────────────────
+const SUPABASE_URL = "https://yzdglmopwhjgknusjchn.supabase.co";
+const SUPABASE_KEY = "eyJhbGci0iJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6ZGdsbW9wd2hqZ2tudXNqY2huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkxMzQ5NDUsImV4cCI6MjA2NDcxMDk0NX0.eyJhbGci0iJIUzI1NiIsInR5cCI6IkpXVCJ9";
+
+const sb = {
+async getAll(table) {
+const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=*&order=created_at.desc`, {
+headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+});
+const rows = await res.json();
+return rows.map(r => r.data);
+},
+async insert(table, data) {
+await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+method: "POST",
+headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+body: JSON.stringify({ data })
+});
+},
+async update(table, id, data) {
+await fetch(`${SUPABASE_URL}/rest/v1/${table}?data->>id=eq.${id}`, {
+method: "PATCH",
+headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" },
+body: JSON.stringify({ data })
+});
+},
+async delete(table, id) {
+await fetch(`${SUPABASE_URL}/rest/v1/${table}?data->>id=eq.${id}`, {
+method: "DELETE",
+headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+});
+},
+async replaceAll(table, items) {
+// Delete all then insert all - simplest sync approach
+await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=gte.0`, {
+method: "DELETE",
+headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+});
+if (items.length > 0) {
+const rows = items.map(data => ({ data }));
+await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+method: "POST",
+headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+body: JSON.stringify(rows)
+});
+}
+}
+};
+
+// ─── Cloud Sync Hook ─────────────────────────────────────────────
+const TABLE_MAP = {
+tasks:"tasks", projects:"projects", clients:"clients", inquiries:"inquiries",
+contracts:"contracts", quotes:"quotes", quickquotes:"quickquotes",
+inspection:"inspection", acceptance:"acceptance", pending:"pending",
+knowledge:"knowledge", lighting:"lighting", design:"design",
+ledger:"ledger", purchase:"purchase", expense:"expense", payroll:"payroll",
+monthly:"monthly", attendance:"attendance", leave:"leave_requests",
+overtime:"overtime", materials:"materials", inventory:"inventory",
+tracking:"tracking", losses:"losses", appointments:"appointments",
+schedule:"schedule", album:"album"
+};
+
+function useCloudSync(key, defaultValue) {
+const tableName = TABLE_MAP[key];
+const [value, setValue] = useState(defaultValue);
+const [synced, setSynced] = useState(false);
+
+// Load from cloud on mount
+useEffect(() => {
+if (!tableName) return;
+sb.getAll(tableName).then(rows => {
+if (rows && rows.length > 0) setValue(rows.filter(Boolean));
+setSynced(true);
+}).catch(() => setSynced(true));
+}, [tableName]);
+
+// Save to cloud when value changes (after initial sync)
+useEffect(() => {
+if (!synced || !tableName) return;
+const t = setTimeout(() => {
+sb.replaceAll(tableName, value).catch(console.error);
+}, 1000); // debounce 1 second
+return () => clearTimeout(t);
+}, [value, synced, tableName]);
+
+// Also keep localStorage as fallback
+useEffect(() => {
+try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+}, [key, value]);
+
+return [value, setValue];
+}
+
+
+
 function useLocalStorage(key, defaultValue) {
 const [value, setValue] = useState(() => {
 try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : defaultValue; }
@@ -2325,44 +2420,62 @@ export default function App() {
 const [activeId, setActiveId] = useState("dashboard");
 const [sidebarOpen, setSidebarOpen] = useState(false);
 const [notifOpen, setNotifOpen] = useState(false);
-const [dismissed, setDismissed] = useLocalStorage("dismissed_notifs", []);
+const [dismissed, setDismissed] = useCloudSync("dismissed_notifs", []);
 const [unlockedPages, setUnlockedPages] = useState([]);
 const [pendingPageId, setPendingPageId] = useState(null);
-const [appPassword, setAppPassword] = useLocalStorage("appPassword", "1234");
-const [tasks, setTasks] = useLocalStorage("tasks", []);
-const [projects, setProjects] = useLocalStorage("projects", []);
-const [inquiries, setInquiries] = useLocalStorage("inquiries", []);
-const [contracts, setContracts] = useLocalStorage("contracts", []);
-const [quotes, setQuotes] = useLocalStorage("quotes", []);
-const [inspection, setInspection] = useLocalStorage("inspection", []);
-const [acceptance, setAcceptance] = useLocalStorage("acceptance", []);
-const [pending, setPending] = useLocalStorage("pending", []);
-const [knowledge, setKnowledge] = useLocalStorage("knowledge", []);
-const [lighting, setLighting] = useLocalStorage("lighting", []);
-const [design, setDesign] = useLocalStorage("design", []);
-const [ledger, setLedger] = useLocalStorage("ledger", []);
-const [purchase, setPurchase] = useLocalStorage("purchase", []);
-const [expense, setExpense] = useLocalStorage("expense", []);
-const [payroll, setPayroll] = useLocalStorage("payroll", []);
-const [monthly, setMonthly] = useLocalStorage("monthly", []);
-const [attendance, setAttendance] = useLocalStorage("attendance", []);
-const [leave, setLeave] = useLocalStorage("leave", []);
-const [overtime, setOvertime] = useLocalStorage("overtime", []);
-const [materials, setMaterials] = useLocalStorage("materials", []);
-const [inventory, setInventory] = useLocalStorage("inventory", []);
-const [tracking, setTracking] = useLocalStorage("tracking", []);
-const [losses, setLosses] = useLocalStorage("losses", []);
-const [appointments, setAppointments] = useLocalStorage("appointments", []);
-const [clients, setClients] = useLocalStorage("clients", []);
-const [quickquotes, setQuickquotes] = useLocalStorage("quickquotes", []);
-const [schedule, setSchedule] = useLocalStorage("schedule", []);
-const [album, setAlbum] = useLocalStorage("album", []);
-const [companyInfo, setCompanyInfo] = useLocalStorage("companyInfo", {});
-const [notifSettings, setNotifSettings] = useLocalStorage("notifSettings", {taskOverdue:true,taskDueToday:true,lowInventory:true,pendingApproval:true,quoteExpiry:true,projectNoUpdate:true});
-const [menuCustom, setMenuCustom] = useLocalStorage("menuCustom", {});
+const [appPassword, setAppPassword] = useCloudSync("appPassword", "1234");
+const [tasks, setTasks] = useCloudSync("tasks", []);
+const [projects, setProjects] = useCloudSync("projects", []);
+const [inquiries, setInquiries] = useCloudSync("inquiries", []);
+const [contracts, setContracts] = useCloudSync("contracts", []);
+const [quotes, setQuotes] = useCloudSync("quotes", []);
+const [inspection, setInspection] = useCloudSync("inspection", []);
+const [acceptance, setAcceptance] = useCloudSync("acceptance", []);
+const [pending, setPending] = useCloudSync("pending", []);
+const [knowledge, setKnowledge] = useCloudSync("knowledge", []);
+const [lighting, setLighting] = useCloudSync("lighting", []);
+const [design, setDesign] = useCloudSync("design", []);
+const [ledger, setLedger] = useCloudSync("ledger", []);
+const [purchase, setPurchase] = useCloudSync("purchase", []);
+const [expense, setExpense] = useCloudSync("expense", []);
+const [payroll, setPayroll] = useCloudSync("payroll", []);
+const [monthly, setMonthly] = useCloudSync("monthly", []);
+const [attendance, setAttendance] = useCloudSync("attendance", []);
+const [leave, setLeave] = useCloudSync("leave", []);
+const [overtime, setOvertime] = useCloudSync("overtime", []);
+const [materials, setMaterials] = useCloudSync("materials", []);
+const [inventory, setInventory] = useCloudSync("inventory", []);
+const [tracking, setTracking] = useCloudSync("tracking", []);
+const [losses, setLosses] = useCloudSync("losses", []);
+const [appointments, setAppointments] = useCloudSync("appointments", []);
+const [clients, setClients] = useCloudSync("clients", []);
+const [quickquotes, setQuickquotes] = useCloudSync("quickquotes", []);
+const [schedule, setSchedule] = useCloudSync("schedule", []);
+const [album, setAlbum] = useCloudSync("album", []);
+const [companyInfo, setCompanyInfo] = useCloudSync("companyInfo", {});
+const [notifSettings, setNotifSettings] = useCloudSync("notifSettings", {taskOverdue:true,taskDueToday:true,lowInventory:true,pendingApproval:true,quoteExpiry:true,projectNoUpdate:true});
+const [menuCustom, setMenuCustom] = useCloudSync("menuCustom", {});
 
 const allNotifs = useNotifications(tasks, projects, inventory, tracking, leave, overtime, acceptance, pending, quotes);
 const notifications = allNotifs.filter(n => !dismissed.includes(n.id));
+
+const [syncStatus, setSyncStatus] = useState("idle"); // idle, syncing, synced, error
+
+// Global sync indicator
+useEffect(() => {
+const orig = sb.replaceAll.bind(sb);
+sb.replaceAll = async (table, items) => {
+setSyncStatus("syncing");
+try {
+await orig(table, items);
+setSyncStatus("synced");
+setTimeout(() => setSyncStatus("idle"), 2000);
+} catch(e) {
+setSyncStatus("error");
+setTimeout(() => setSyncStatus("idle"), 3000);
+}
+};
+}, []);
 
 const clearAll=()=>{
 ["tasks","projects","inquiries","contracts","quotes","inspection","acceptance","pending",
@@ -2424,6 +2537,11 @@ return(
 <span className="block w-5 h-0.5 bg-stone-600"/><span className="block w-5 h-0.5 bg-stone-600"/><span className="block w-3 h-0.5 bg-stone-600"/>
 </button>
 <span className="text-sm font-semibold text-stone-700">{activeItem?(menuCustom[activeItem.id]?.label||activeItem.label):"工作面板"}</span>
+<div className="flex items-center gap-1">
+{syncStatus==="syncing"&&<span className="text-xs text-blue-400 animate-pulse">同步中</span>}
+{syncStatus==="synced"&&<span className="text-xs text-emerald-500">✓ 已同步</span>}
+{syncStatus==="error"&&<span className="text-xs text-red-400">同步失敗</span>}
+</div>
 <button onClick={()=>setNotifOpen(true)} className="w-9 h-9 flex items-center justify-center relative">
 <span className="text-xl">🔔</span>
 {notifications.length>0&&<span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"><span className="text-white text-[9px] font-bold">{notifications.length}</span></span>}
