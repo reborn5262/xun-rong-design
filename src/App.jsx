@@ -1128,16 +1128,57 @@ return (
 );
 }
 
-function Settings({ onClearAll, companyInfo, setCompanyInfo, notifSettings, setNotifSettings, menuCustom, setMenuCustom }) {
+function Settings({ onClearAll, companyInfo, setCompanyInfo, notifSettings, setNotifSettings, menuCustom, setMenuCustom, appPassword, setAppPassword }) {
 const [confirm, setConfirm] = useState(false);
 const [company, setCompany] = useState(companyInfo || {name:"",phone:"",address:"",taxId:"",bank:"",bankAccount:""});
 const [notif, setNotif] = useState(notifSettings || {taskOverdue:true,taskDueToday:true,lowInventory:true,pendingApproval:true,quoteExpiry:true,projectNoUpdate:true});
+const [pwForm, setPwForm] = useState({current:"",newPw:"",confirm:""});
+const [pwError, setPwError] = useState("");
+const [pwSuccess, setPwSuccess] = useState(false);
+
+const saveCompany = () => { setCompanyInfo(company); alert("✅ 公司資料已儲存"); };
+const saveNotif = () => { setNotifSettings(notif); alert("✅ 通知設定已儲存"); };
+
+const changePassword = () => {
+if (pwForm.current !== appPassword) { setPwError("目前密碼錯誤"); return; }
+if (pwForm.newPw.length < 4) { setPwError("新密碼至少需要 4 位"); return; }
+if (pwForm.newPw !== pwForm.confirm) { setPwError("兩次密碼不一致"); return; }
+setAppPassword(pwForm.newPw);
+setPwForm({current:"",newPw:"",confirm:""});
+setPwError("");
+setPwSuccess(true);
+setTimeout(() => setPwSuccess(false), 2000);
+};
 
 const saveCompany = () => { setCompanyInfo(company); alert("✅ 公司資料已儲存"); };
 const saveNotif = () => { setNotifSettings(notif); alert("✅ 通知設定已儲存"); };
 
 return(
 <div className="space-y-3">
+
+{/* Password Management */}
+<SettingsSection title="密碼與權限管理" icon="🔐" defaultOpen={true}>
+<div className="mt-3 space-y-3">
+<div className="bg-stone-50 rounded-xl p-3 text-xs text-stone-500 space-y-1">
+<div className="font-medium text-stone-600 mb-2">🔒 以下功能需密碼存取：</div>
+{Object.entries(PROTECTED_PAGES).map(([id,p])=>(
+<div key={id} className="flex items-center gap-2">
+<span>{p.icon}</span><span>{p.label}</span>
+</div>
+))}
+</div>
+<div className="text-xs text-stone-400 font-medium mt-2">更改密碼</div>
+<div className="relative">
+<input type="password" className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm" placeholder="目前密碼" value={pwForm.current} onChange={e=>setPwForm({...pwForm,current:e.target.value})}/>
+</div>
+<input type="password" className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm" placeholder="新密碼（至少4位）" value={pwForm.newPw} onChange={e=>setPwForm({...pwForm,newPw:e.target.value})}/>
+<input type="password" className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm" placeholder="確認新密碼" value={pwForm.confirm} onChange={e=>setPwForm({...pwForm,confirm:e.target.value})}/>
+{pwError && <div className="text-xs text-red-500 text-center">{pwError}</div>}
+{pwSuccess && <div className="text-xs text-emerald-500 text-center">✅ 密碼已更新！</div>}
+<button onClick={changePassword} className="w-full bg-stone-800 text-white rounded-xl py-2.5 text-sm font-medium">更新密碼</button>
+<div className="text-xs text-stone-300 text-center">預設密碼：1234</div>
+</div>
+</SettingsSection>
 
 {/* Company Info */}
 <SettingsSection title="公司基本資料" icon="🏢" defaultOpen={true}>
@@ -2211,11 +2252,85 @@ return (
 );
 }
 
+
+// ─── Permission System ──────────────────────────────────────────
+const PROTECTED_PAGES = {
+clients: { label:"客戶管理", icon:"👥" },
+ledger: { label:"公司帳本", icon:"📒" },
+purchase: { label:"採購申請單", icon:"💵" },
+expense: { label:"報銷申請", icon:"🧾" },
+payroll: { label:"薪資計算", icon:"💳" },
+monthly: { label:"月度支出", icon:"🐷" },
+forecast: { label:"財務預測", icon:"📈" },
+profit: { label:"利潤分析", icon:"📈" },
+losses: { label:"異常損失", icon:"⚠" },
+settings: { label:"系統設定", icon:"⚙" },
+};
+
+function LockScreen({ pageId, onUnlock, onCancel, savedPassword }) {
+const [input, setInput] = useState("");
+const [error, setError] = useState(false);
+const [showPw, setShowPw] = useState(false);
+const page = PROTECTED_PAGES[pageId];
+
+const tryUnlock = () => {
+const pw = savedPassword || "1234";
+if (input === pw) {
+onUnlock(pageId);
+setInput("");
+setError(false);
+} else {
+setError(true);
+setInput("");
+setTimeout(() => setError(false), 1500);
+}
+};
+
+return (
+<div className="flex flex-col items-center justify-center py-16 px-6 space-y-6">
+<div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl ${error ? "bg-red-100 animate-pulse" : "bg-stone-100"}`}>
+{error ? "❌" : "🔒"}
+</div>
+<div className="text-center">
+<div className="text-base font-semibold text-stone-800">{page?.icon} {page?.label}</div>
+<div className="text-sm text-stone-400 mt-1">此功能需要密碼才能存取</div>
+</div>
+<div className="w-full space-y-3">
+<div className="relative">
+<input
+type={showPw ? "text" : "password"}
+className={`w-full border-2 rounded-2xl px-4 py-3.5 text-center text-lg tracking-widest focus:outline-none transition-colors ${error ? "border-red-400 bg-red-50" : "border-stone-200 focus:border-stone-400"}`}
+placeholder="輸入密碼"
+value={input}
+onChange={e => setInput(e.target.value)}
+onKeyDown={e => e.key === "Enter" && tryUnlock()}
+autoFocus
+/>
+<button onClick={() => setShowPw(!showPw)} className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 text-sm">
+{showPw ? "隱藏" : "顯示"}
+</button>
+</div>
+{error && <div className="text-center text-red-500 text-sm font-medium">密碼錯誤，請再試一次</div>}
+<button onClick={tryUnlock} className="w-full bg-stone-800 text-white rounded-2xl py-3.5 font-medium text-sm">
+解鎖
+</button>
+<button onClick={onCancel} className="w-full text-stone-400 text-sm py-2">
+返回
+</button>
+</div>
+<div className="text-xs text-stone-300 text-center">預設密碼可在系統設定中更改</div>
+</div>
+);
+}
+
 export default function App() {
 const [activeId, setActiveId] = useState("dashboard");
 const [sidebarOpen, setSidebarOpen] = useState(false);
 const [notifOpen, setNotifOpen] = useState(false);
 const [dismissed, setDismissed] = useLocalStorage("dismissed_notifs", []);
+const [unlockedPages, setUnlockedPages] = useState([]);
+const [pendingPageId, setPendingPageId] = useState(null);
+const [appPassword, setAppPassword] = useLocalStorage("appPassword", "1234");
 const [tasks, setTasks] = useLocalStorage("tasks", []);
 const [projects, setProjects] = useLocalStorage("projects", []);
 const [inquiries, setInquiries] = useLocalStorage("inquiries", []);
@@ -2298,7 +2413,7 @@ case "inventory": return <Inventory items={inventory} setItems={setInventory}/>;
 case "tracking": return <Tracking items={tracking} setItems={setTracking}/>;
 case "profit": return <Profit ledger={ledger} projects={projects}/>;
 case "losses": return <Losses items={losses} setItems={setLosses}/>;
-case "settings": return <Settings onClearAll={clearAll} companyInfo={companyInfo} setCompanyInfo={setCompanyInfo} notifSettings={notifSettings} setNotifSettings={setNotifSettings} menuCustom={menuCustom} setMenuCustom={setMenuCustom}/>;
+case "settings": return <Settings onClearAll={clearAll} companyInfo={companyInfo} setCompanyInfo={setCompanyInfo} notifSettings={notifSettings} setNotifSettings={setNotifSettings} menuCustom={menuCustom} setMenuCustom={setMenuCustom} appPassword={appPassword} setAppPassword={setAppPassword}/>;
 default: return <div className="text-center text-stone-400 py-16 text-sm">🔧 功能開發中</div>;
 }
 };
@@ -2325,10 +2440,11 @@ return(
 <div key={si} className="mb-2">
 {section.label!=="DASHBOARD"&&<div className="px-5 pt-4 pb-1 text-xs text-stone-400 tracking-wider">{section.label}</div>}
 {section.items.map(item=>(
-<button key={item.id} onClick={()=>{setActiveId(item.id);setSidebarOpen(false);}}
+<button key={item.id} onClick={()=>{ const isProtected = Object.keys(PROTECTED_PAGES).includes(item.id) && !unlockedPages.includes(item.id); if(isProtected){setPendingPageId(item.id);setSidebarOpen(false);}else{setActiveId(item.id);setSidebarOpen(false);}; }}
 className={`w-full flex items-center gap-3 px-5 py-3 text-sm text-left ${activeId===item.id?"bg-stone-100 font-semibold text-stone-900 rounded-xl mx-2 w-[calc(100%-16px)]":"text-stone-600 hover:bg-stone-50"}`}>
 <span>{(menuCustom[item.id]?.icon!==undefined?menuCustom[item.id].icon:item.icon)}</span>
 <span>{(menuCustom[item.id]?.label!==undefined?menuCustom[item.id].label:item.label)}</span>
+{Object.keys(PROTECTED_PAGES).includes(item.id)&&!unlockedPages.includes(item.id)&&<span className="ml-auto text-stone-300 text-xs">🔒</span>}
 </button>
 ))}
 </div>
@@ -2337,6 +2453,7 @@ className={`w-full flex items-center gap-3 px-5 py-3 text-sm text-left ${activeI
 </div>
 </div>
 )}
+{pendingPageId&&<LockScreen pageId={pendingPageId} savedPassword={appPassword} onUnlock={(id)=>{setUnlockedPages(p=>[...p,id]);setActiveId(id);setPendingPageId(null);}} onCancel={()=>setPendingPageId(null)}/>}
 {notifOpen&&<NotificationPanel notifications={notifications} onClose={()=>setNotifOpen(false)} onClearAll={()=>{setDismissed(allNotifs.map(n=>n.id));setNotifOpen(false);}}/>}
 <div className="px-4 pt-4 pb-24">{renderPage()}</div>
 <div className="fixed bottom-0 bg-white border-t border-stone-100 flex items-center justify-around py-2 z-30" style={{maxWidth:430,left:"50%",transform:"translateX(-50%)",width:"100%"}}>
@@ -2344,7 +2461,7 @@ className={`w-full flex items-center gap-3 px-5 py-3 text-sm text-left ${activeI
 const customIcon = menuCustom[tab.id]?.icon !== undefined ? menuCustom[tab.id].icon : tab.icon;
 const customLabel = menuCustom[tab.id]?.label !== undefined ? menuCustom[tab.id].label.slice(0,4) : tab.label;
 return (
-<button key={tab.id} onClick={()=>setActiveId(tab.id)} className={`flex flex-col items-center gap-0.5 px-4 py-1 ${activeId===tab.id?"text-stone-900":"text-stone-400"}`}>
+<button key={tab.id} onClick={()=>{ const isProtected=Object.keys(PROTECTED_PAGES).includes(tab.id)&&!unlockedPages.includes(tab.id); if(isProtected)setPendingPageId(tab.id); else setActiveId(tab.id); }} className={`flex flex-col items-center gap-0.5 px-4 py-1 ${activeId===tab.id?"text-stone-900":"text-stone-400"}`}>
 <span className="text-lg">{customIcon}</span>
 <span className="text-xs">{customLabel}</span>
 {activeId===tab.id&&<span className="w-1 h-1 bg-stone-800 rounded-full"/>}
