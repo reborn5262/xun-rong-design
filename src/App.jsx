@@ -328,7 +328,7 @@ return (
 );
 }
 
-function Tasks({ tasks, setTasks }) {
+function Tasks({ tasks, setTasks, projects }) {
 const [modal, setModal] = useState(false);
 const [edit, setEdit] = useState(null);
 const [filter, setFilter] = useState("全部");
@@ -489,7 +489,7 @@ const Appointments = mkPage([
 {key:"date",label:"日期",inputType:"date"},{key:"time",label:"時間",inputType:"time"}
 ]},
 {key:"location",label:"地點"},
-{key:"project",label:"所屬專案",type:"select",options:getProjectOpts(projects)},
+{key:"project",label:"所屬專案",type:"select",options:[""]},
 {key:"status",label:"狀態",type:"select",options:["確認中","已確認","已完成","取消"],default:"確認中"},
 {key:"note",label:"備註",type:"textarea"},
 ],"預約",i=>(
@@ -501,7 +501,7 @@ const Appointments = mkPage([
 </>
 ));
 
-function Appointments2({ items, setItems }) {
+function Appointments2({ items, setItems, projects }) {
 const [modal, setModal] = useState(false);
 const [edit, setEdit] = useState(null);
 const blank = {title:"",client:"",type:"現場勘查",date:"",time:"",location:"",project:"",status:"確認中",note:""};
@@ -851,7 +851,7 @@ renderItem={i=>(
 )}/>;
 }
 
-function Ledger({ items, setItems }) {
+function Ledger({ items, setItems, projects }) {
 const [modal, setModal] = useState(false);
 const [edit, setEdit] = useState(null);
 const blank = {date:"",type:"收入",project:"",category:"工程款",amount:"",note:""};
@@ -899,7 +899,7 @@ renderItem={i=>(
 );
 }
 
-function Purchase({ items, setItems }) {
+function Purchase({ items, setItems, projects }) {
 return <SimpleForm addLabel="新增採購" items={items} setItems={setItems}
 fields={[
 {key:"item",label:"採購品項 *",req:true},
@@ -919,7 +919,7 @@ renderItem={i=>(
 )}/>;
 }
 
-function Expense({ items, setItems }) {
+function Expense({ items, setItems, projects }) {
 return <SimpleForm addLabel="新增報銷" items={items} setItems={setItems}
 fields={[
 {key:"name",label:"申請人"},
@@ -1088,7 +1088,7 @@ renderItem={i=>(
 )}/>;
 }
 
-function Overtime({ items, setItems }) {
+function Overtime({ items, setItems, projects }) {
 return <SimpleForm addLabel="新增加班" items={items} setItems={setItems}
 fields={[
 {key:"name",label:"員工姓名 *",req:true},
@@ -1149,7 +1149,7 @@ renderItem={i=>(
 );
 }
 
-function Tracking({ items, setItems }) {
+function Tracking({ items, setItems, projects }) {
 return <SimpleForm addLabel="新增備料" items={items} setItems={setItems}
 fields={[
 {key:"material",label:"材料名稱 *",req:true},
@@ -1193,7 +1193,7 @@ return(
 );
 }
 
-function Losses({ items, setItems }) {
+function Losses({ items, setItems, projects }) {
 const total=items.reduce((s,i)=>s+Number(i.amount||0),0);
 return(
 <>
@@ -4470,7 +4470,7 @@ const activeItem=NAV_SECTIONS.flatMap(s=>s.items).find(i=>i.id===activeId);
 const renderPage=()=>{
 switch(activeId){
 case "dashboard": return (<Dashboard tasks={tasks} projects={projects} attendance={attendance} setActiveId={setActiveId}/>);
-case "tasks": return (<Tasks tasks={tasks} setTasks={setTasks}/>);
+case "tasks": return (<Tasks tasks={tasks} setTasks={setTasks} projects={projects}/>);
 case "calendar": return (<Calendar tasks={tasks}/>);
 case "quickquote": return (<QuickQuote items={quickquotes} setItems={setQuickquotes}/>);
 case "clients": return (<Clients items={clients} setItems={setClients}/>);
@@ -4491,7 +4491,7 @@ case "checklist": return (<StandardChecklist items={checklist} setItems={setChec
 case "paymenttrack": return (<PaymentTracker items={paymenttrack} setItems={setPaymenttrack} projects={projects} ledger={ledger}/>);
 case "sitemap": return (<SiteMap projects={projects}/>);
 case "reports": return (<Reports projects={projects} tasks={tasks} ledger={ledger} clients={clients} quotes={quotes} contracts={contracts} attendance={attendance}/>);
-case "appointments": return (<Appointments2 items={appointments} setItems={setAppointments}/>);
+case "appointments": return (<Appointments2 items={appointments} setItems={setAppointments} projects={projects}/>);
 case "inquiries": return (<Inquiries items={inquiries} setItems={setInquiries}/>);
 case "projects": return (<Projects items={projects} setItems={setProjects}/>);
 case "contracts": return (<Contracts items={contracts} setItems={setContracts} projects={projects}/>);
@@ -4503,20 +4503,20 @@ case "knowledge": return (<Knowledge items={knowledge} setItems={setKnowledge}/>
 case "lighting": return (<Lighting items={lighting} setItems={setLighting} projects={projects}/>);
 case "design": return (<Design items={design} setItems={setDesign} projects={projects}/>);
 case "tiles": return (<TilesCalc/>);
-case "ledger": return (<Ledger items={ledger} setItems={setLedger}/>);
-case "purchase": return (<Purchase items={purchase} setItems={setPurchase}/>);
-case "expense": return (<Expense items={expense} setItems={setExpense}/>);
+case "ledger": return (<Ledger items={ledger} setItems={setLedger} projects={projects}/>);
+case "purchase": return (<Purchase items={purchase} setItems={setPurchase} projects={projects}/>);
+case "expense": return (<Expense items={expense} setItems={setExpense} projects={projects}/>);
 case "payroll": return (<Payroll items={payroll} setItems={setPayroll}/>);
 case "monthly": return (<Monthly items={monthly} setItems={setMonthly}/>);
 case "forecast": return (<Forecast ledger={ledger} projects={projects}/>);
 case "attendance": return (<Attendance items={attendance} setItems={setAttendance}/>);
 case "leave": return (<Leave items={leave} setItems={setLeave}/>);
-case "overtime": return (<Overtime items={overtime} setItems={setOvertime}/>);
+case "overtime": return (<Overtime items={overtime} setItems={setOvertime} projects={projects}/>);
 case "materials": return (<Materials items={materials} setItems={setMaterials}/>);
 case "inventory": return (<Inventory items={inventory} setItems={setInventory}/>);
-case "tracking": return (<Tracking items={tracking} setItems={setTracking}/>);
+case "tracking": return (<Tracking items={tracking} setItems={setTracking} projects={projects}/>);
 case "profit": return (<Profit ledger={ledger} projects={projects}/>);
-case "losses": return (<Losses items={losses} setItems={setLosses}/>);
+case "losses": return (<Losses items={losses} setItems={setLosses} projects={projects}/>);
 case "settings": return (<Settings onClearAll={clearAll} rolePasswords={rolePasswords} setRolePasswords={setRolePasswords} customRoles={customRoles} setCustomRoles={setCustomRoles} hiddenPages={hiddenPages} setHiddenPages={setHiddenPages} companyInfo={companyInfo} setCompanyInfo={setCompanyInfo} notifSettings={notifSettings} setNotifSettings={setNotifSettings} menuCustom={menuCustom} setMenuCustom={setMenuCustom} appPassword={appPassword} setAppPassword={setAppPassword}/>);
 default: return (<div className="text-center text-stone-400 py-16 text-sm">🔧 功能開發中</div>);
 }
