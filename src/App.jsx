@@ -190,7 +190,12 @@ const NAV_SECTIONS = [
 ]},
 ];
 
-const PROJECT_LIST = ["台北大安區 林宅","信義區 陳宅翻修","中山區 王宅","松山區 商辦空間","內湖 科技公司","公司內部"];
+const PROJECT_LIST = ["公司內部"];
+function getProjectOpts(projects) {
+const names = (projects||[]).map(p=>p.name).filter(Boolean);
+const merged = [...new Set([...names, "公司內部"])];
+return ["", ...merged];
+}
 const SC = { "施工中":"blue","設計中":"yellow","驗收中":"green","報價中":"gray","完工":"green","待審":"yellow","已核准":"green","已拒絕":"red","進行中":"blue","已完成":"green","草稿":"gray","確認中":"blue","已確認":"green","取消":"red" };
 
 function Badge({ color, children }) {
@@ -376,7 +381,7 @@ return (
 <Modal title={edit?"編輯任務":"新增任務"} onClose={()=>setModal(false)}>
 <div className="space-y-3">
 <Inp label="任務名稱 *" placeholder="輸入任務名稱" value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/>
-<Sel label="所屬專案" options={["",...PROJECT_LIST]} value={form.project} onChange={e=>setForm({...form,project:e.target.value})}/>
+<Sel label="所屬專案" options={getProjectOpts(projects)} value={form.project} onChange={e=>setForm({...form,project:e.target.value})}/>
 <div className="grid grid-cols-2 gap-3">
 <Sel label="優先度" options={["高","中","低"]} value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})}/>
 <Inp label="截止日期" type="date" value={form.due} onChange={e=>setForm({...form,due:e.target.value})}/>
@@ -484,7 +489,7 @@ const Appointments = mkPage([
 {key:"date",label:"日期",inputType:"date"},{key:"time",label:"時間",inputType:"time"}
 ]},
 {key:"location",label:"地點"},
-{key:"project",label:"所屬專案",type:"select",options:["",...PROJECT_LIST]},
+{key:"project",label:"所屬專案",type:"select",options:getProjectOpts(projects)},
 {key:"status",label:"狀態",type:"select",options:["確認中","已確認","已完成","取消"],default:"確認中"},
 {key:"note",label:"備註",type:"textarea"},
 ],"預約",i=>(
@@ -526,7 +531,7 @@ renderItem={i=>(
 <Sel label="類型" options={["現場勘查","設計討論","簽約","驗收","其他"]} value={form.type} onChange={e=>setForm({...form,type:e.target.value})}/>
 <div className="grid grid-cols-2 gap-3"><Inp label="日期" type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/><Inp label="時間" type="time" value={form.time} onChange={e=>setForm({...form,time:e.target.value})}/></div>
 <Inp label="地點" value={form.location} onChange={e=>setForm({...form,location:e.target.value})}/>
-<Sel label="所屬專案" options={["",...PROJECT_LIST]} value={form.project} onChange={e=>setForm({...form,project:e.target.value})}/>
+<Sel label="所屬專案" options={getProjectOpts(projects)} value={form.project} onChange={e=>setForm({...form,project:e.target.value})}/>
 <Sel label="狀態" options={["確認中","已確認","已完成","取消"]} value={form.status} onChange={e=>setForm({...form,status:e.target.value})}/>
 <Txt label="備註" value={form.note} onChange={e=>setForm({...form,note:e.target.value})}/>
 </div>
@@ -634,10 +639,10 @@ renderItem={i=>(
 )}/>;
 }
 
-function Contracts({ items, setItems }) {
+function Contracts({ items, setItems, projects }) {
 return <SimpleForm addLabel="新增合約" items={items} setItems={setItems}
 fields={[
-{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...PROJECT_LIST]},
+{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:getProjectOpts(projects)},
 {key:"client",label:"客戶"},{key:"amount",label:"合約金額",ph:"NT$"},
 {key:"signDate",label:"簽約日期",it:"date"},
 {grid:2,children:[{key:"startDate",label:"開工日期",it:"date"},{key:"endDate",label:"完工日期",it:"date"}]},
@@ -654,10 +659,10 @@ renderItem={i=>(
 )}/>;
 }
 
-function Quotes({ items, setItems }) {
+function Quotes({ items, setItems, projects }) {
 return <SimpleForm addLabel="新增報價" items={items} setItems={setItems}
 fields={[
-{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...PROJECT_LIST]},
+{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:getProjectOpts(projects)},
 {key:"client",label:"客戶"},{key:"total",label:"報價總額",ph:"NT$"},
 {grid:2,children:[{key:"date",label:"報價日期",it:"date"},{key:"validUntil",label:"有效期限",it:"date"}]},
 {key:"status",label:"狀態",type:"sel",opts:["草稿","已送出","已核准","已拒絕"],default:"草稿"},
@@ -674,10 +679,10 @@ renderItem={i=>(
 )}/>;
 }
 
-function Inspection({ items, setItems }) {
+function Inspection({ items, setItems, projects }) {
 return <SimpleForm addLabel="新增檢核" items={items} setItems={setItems}
 fields={[
-{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...PROJECT_LIST]},
+{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:getProjectOpts(projects)},
 {grid:2,children:[{key:"type",label:"工種",type:"sel",opts:["木作","泥作","水電","油漆","鐵件","其他"]},{key:"inspector",label:"檢核人員"}]},
 {key:"date",label:"檢核日期",it:"date"},
 {key:"result",label:"結果",type:"sel",opts:["待審","通過","不通過","待改善"],default:"待審"},
@@ -694,10 +699,10 @@ renderItem={i=>(
 )}/>;
 }
 
-function Acceptance({ items, setItems }) {
+function Acceptance({ items, setItems, projects }) {
 return <SimpleForm addLabel="新增驗收" items={items} setItems={setItems}
 fields={[
-{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...PROJECT_LIST]},
+{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:getProjectOpts(projects)},
 {key:"client",label:"客戶"},{key:"date",label:"驗收日期",it:"date"},
 {key:"status",label:"狀態",type:"sel",opts:["待驗收","已完成","有缺失"],default:"待驗收"},
 {key:"items_checked",label:"驗收項目",type:"txt",ph:"列出驗收項目"},
@@ -714,10 +719,10 @@ renderItem={i=>(
 )}/>;
 }
 
-function Pending({ items, setItems }) {
+function Pending({ items, setItems, projects }) {
 return <SimpleForm addLabel="新增待確認" items={items} setItems={setItems}
 fields={[
-{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...PROJECT_LIST]},
+{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:getProjectOpts(projects)},
 {key:"client",label:"客戶"},
 {key:"type",label:"類型",type:"sel",opts:["設計確認","材料確認","報價確認","合約確認","其他"]},
 {key:"deadline",label:"截止日期",it:"date"},
@@ -807,10 +812,10 @@ return(
 );
 }
 
-function Lighting({ items, setItems }) {
+function Lighting({ items, setItems, projects }) {
 return <SimpleForm addLabel="新增燈具" items={items} setItems={setItems}
 fields={[
-{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...PROJECT_LIST]},
+{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:getProjectOpts(projects)},
 {grid:2,children:[{key:"room",label:"空間",type:"sel",opts:["客廳","臥室","廚房","浴室","走廊","書房","餐廳","其他"]},{key:"type",label:"燈具類型",type:"sel",opts:["主燈","嵌燈","吊燈","壁燈","夜燈","軌道燈","其他"]}]},
 {key:"brand",label:"品牌"},
 {grid:3,children:[{key:"watt",label:"瓦數W",it:"number"},{key:"colorTemp",label:"色溫",type:"sel",opts:["2700K","3000K","4000K","5000K","6500K"]},{key:"qty",label:"數量",it:"number"}]},
@@ -827,10 +832,10 @@ renderItem={i=>(
 )}/>;
 }
 
-function Design({ items, setItems }) {
+function Design({ items, setItems, projects }) {
 return <SimpleForm addLabel="新增提案" items={items} setItems={setItems}
 fields={[
-{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...PROJECT_LIST]},
+{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:getProjectOpts(projects)},
 {key:"name",label:"提案名稱"},
 {key:"style",label:"風格",type:"sel",opts:["現代風","北歐風","工業風","日式風","古典風","混搭風","其他"]},
 {key:"budget",label:"設計預算",ph:"NT$"},
@@ -884,7 +889,7 @@ renderItem={i=>(
 <Inp label="金額 *" type="number" placeholder="0" value={form.amount} onChange={e=>setForm({...form,amount:e.target.value})}/>
 </div>
 <Sel label="類別" options={["工程款","設計費","材料費","人工費","管銷費","其他"]} value={form.category} onChange={e=>setForm({...form,category:e.target.value})}/>
-<Sel label="所屬專案" options={["",...PROJECT_LIST]} value={form.project} onChange={e=>setForm({...form,project:e.target.value})}/>
+<Sel label="所屬專案" options={getProjectOpts(projects)} value={form.project} onChange={e=>setForm({...form,project:e.target.value})}/>
 <Inp label="日期" type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/>
 <Txt label="備註" value={form.note} onChange={e=>setForm({...form,note:e.target.value})}/>
 </div>
@@ -898,7 +903,7 @@ function Purchase({ items, setItems }) {
 return <SimpleForm addLabel="新增採購" items={items} setItems={setItems}
 fields={[
 {key:"item",label:"採購品項 *",req:true},
-{key:"project",label:"所屬專案",type:"sel",opts:["",...PROJECT_LIST]},
+{key:"project",label:"所屬專案",type:"sel",opts:getProjectOpts(projects)},
 {grid:3,children:[{key:"qty",label:"數量",it:"number"},{key:"unit",label:"單位",ph:"個/箱/片"},{key:"price",label:"單價",it:"number"}]},
 {key:"supplier",label:"供應商"},
 {key:"date",label:"需求日期",it:"date"},
@@ -921,7 +926,7 @@ fields={[
 {key:"category",label:"費用類別",type:"sel",opts:["交通費","餐費","住宿費","材料費","工具費","其他"]},
 {key:"amount",label:"金額 *",req:true,it:"number"},
 {key:"date",label:"費用日期",it:"date"},
-{key:"project",label:"所屬專案",type:"sel",opts:["",...PROJECT_LIST]},
+{key:"project",label:"所屬專案",type:"sel",opts:getProjectOpts(projects)},
 {key:"status",label:"狀態",type:"sel",opts:["待審","已核准","已拒絕","已撥款"],default:"待審"},
 {key:"note",label:"說明",type:"txt"},
 ]}
@@ -1089,7 +1094,7 @@ fields={[
 {key:"name",label:"員工姓名 *",req:true},
 {key:"date",label:"加班日期",it:"date"},
 {grid:3,children:[{key:"startTime",label:"開始",it:"time"},{key:"endTime",label:"結束",it:"time"},{key:"hours",label:"時數",it:"number"}]},
-{key:"project",label:"所屬專案",type:"sel",opts:["",...PROJECT_LIST]},
+{key:"project",label:"所屬專案",type:"sel",opts:getProjectOpts(projects)},
 {key:"reason",label:"加班原因",type:"txt"},
 {key:"status",label:"狀態",type:"sel",opts:["待審","已核准","已拒絕"],default:"待審"},
 ]}
@@ -1148,7 +1153,7 @@ function Tracking({ items, setItems }) {
 return <SimpleForm addLabel="新增備料" items={items} setItems={setItems}
 fields={[
 {key:"material",label:"材料名稱 *",req:true},
-{key:"project",label:"所屬專案",type:"sel",opts:["",...PROJECT_LIST]},
+{key:"project",label:"所屬專案",type:"sel",opts:getProjectOpts(projects)},
 {grid:2,children:[{key:"qty",label:"數量"},{key:"unit",label:"單位"}]},
 {key:"needDate",label:"需求日期",it:"date"},
 {key:"supplier",label:"供應商"},
@@ -1165,7 +1170,8 @@ renderItem={i=>(
 }
 
 function Profit({ ledger, projects }) {
-const byProject=PROJECT_LIST.map(name=>{
+const projectNames = [...new Set([(projects||[]).map(p=>p.name), ...ledger.map(i=>i.project)].flat().filter(Boolean))];
+const byProject=projectNames.map(name=>{
 const inc=ledger.filter(i=>i.project===name&&i.type==="收入").reduce((s,i)=>s+Number(i.amount||0),0);
 const exp=ledger.filter(i=>i.project===name&&i.type==="支出").reduce((s,i)=>s+Number(i.amount||0),0);
 return{name,income:inc,expense:exp,profit:inc-exp};
@@ -1197,7 +1203,7 @@ return(
 </div>
 <SimpleForm addLabel="新增損失" items={items} setItems={setItems}
 fields={[
-{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:["",...PROJECT_LIST]},
+{key:"project",label:"所屬專案 *",req:true,type:"sel",opts:getProjectOpts(projects)},
 {key:"type",label:"損失類型",type:"sel",opts:["材料損耗","工程返工","設備損壞","人工浪費","其他"]},
 {key:"amount",label:"損失金額",it:"number",ph:"NT$"},
 {key:"date",label:"發生日期",it:"date"},
@@ -4488,14 +4494,14 @@ case "reports": return (<Reports projects={projects} tasks={tasks} ledger={ledge
 case "appointments": return (<Appointments2 items={appointments} setItems={setAppointments}/>);
 case "inquiries": return (<Inquiries items={inquiries} setItems={setInquiries}/>);
 case "projects": return (<Projects items={projects} setItems={setProjects}/>);
-case "contracts": return (<Contracts items={contracts} setItems={setContracts}/>);
-case "quotes": return (<Quotes items={quotes} setItems={setQuotes}/>);
-case "inspection": return (<Inspection items={inspection} setItems={setInspection}/>);
-case "acceptance": return (<Acceptance items={acceptance} setItems={setAcceptance}/>);
-case "pending": return (<Pending items={pending} setItems={setPending}/>);
+case "contracts": return (<Contracts items={contracts} setItems={setContracts} projects={projects}/>);
+case "quotes": return (<Quotes items={quotes} setItems={setQuotes} projects={projects}/>);
+case "inspection": return (<Inspection items={inspection} setItems={setInspection} projects={projects}/>);
+case "acceptance": return (<Acceptance items={acceptance} setItems={setAcceptance} projects={projects}/>);
+case "pending": return (<Pending items={pending} setItems={setPending} projects={projects}/>);
 case "knowledge": return (<Knowledge items={knowledge} setItems={setKnowledge}/>);
-case "lighting": return (<Lighting items={lighting} setItems={setLighting}/>);
-case "design": return (<Design items={design} setItems={setDesign}/>);
+case "lighting": return (<Lighting items={lighting} setItems={setLighting} projects={projects}/>);
+case "design": return (<Design items={design} setItems={setDesign} projects={projects}/>);
 case "tiles": return (<TilesCalc/>);
 case "ledger": return (<Ledger items={ledger} setItems={setLedger}/>);
 case "purchase": return (<Purchase items={purchase} setItems={setPurchase}/>);
