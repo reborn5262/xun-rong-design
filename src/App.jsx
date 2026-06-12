@@ -1223,6 +1223,8 @@ const [pwSuccess, setPwSuccess] = useState(false);
 const [company, setCompany] = useState(companyInfo || {name:"",phone:"",address:"",taxId:"",bank:"",bankAccount:""});
 const [notif, setNotif] = useState(notifSettings || {taskOverdue:true,taskDueToday:true,lowInventory:true,pendingApproval:true,quoteExpiry:true,projectNoUpdate:true});
 
+const displayRoles = customRoles || ROLES;
+
 const changePassword = () => {
 if (pwForm.current !== (appPassword||"1234")) { setPwError("目前密碼錯誤"); return; }
 if (pwForm.newPw.length < 4) { setPwError("新密碼至少需要 4 位"); return; }
@@ -2133,7 +2135,7 @@ return(
 <div className="bg-stone-800 text-white rounded-2xl p-4">
 <div className="text-xs opacity-60 mb-1">專案報告</div>
 <div className="text-lg font-bold">{p.name}</div>
-<Badge color={{"施工中":"blue","設計中":"yellow","驗收中":"green","完工":"green","報價中":"gray"}[p.status]||"gray"}>{p.status}</Badge>
+<Badge color={{施工中:"blue",設計中:"yellow",驗收中:"green",完工:"green"}[p.status]||"gray"}>{p.status}</Badge>
 </div>
 <div className="bg-white rounded-2xl p-4 border border-stone-100 space-y-2">
 <div className="text-xs font-medium text-stone-400 mb-2">基本資料</div>
@@ -2442,7 +2444,7 @@ style={{left:(getLeft(s.startDate))+"%", width:(getWidth(s.startDate,s.endDate))
 <div className="flex justify-between text-xs mb-1">
 <span className="text-stone-600 truncate max-w-[60%]">{p.name}</span>
 <div className="flex items-center gap-2">
-<Badge color={{"施工中":"blue","設計中":"yellow","驗收中":"green","完工":"green","報價中":"gray"}[p.status]||"gray"}>{p.status}</Badge>
+<Badge color={{施工中:"blue",設計中:"yellow",驗收中:"green",完工:"green",報價中:"gray"}[p.status]||"gray"}>{p.status}</Badge>
 <span className="text-stone-500 font-medium">{p.progress||0}%</span>
 </div>
 </div>
@@ -3221,7 +3223,7 @@ return(
 <div className="flex justify-between text-xs mb-1">
 <span className="text-stone-600 truncate max-w-[55%]">{p.name}</span>
 <div className="flex items-center gap-1">
-<Badge color={{"施工中":"blue","設計中":"yellow","驗收中":"green","完工":"green","報價中":"gray"}[p.status]||"gray"}>{p.status}</Badge>
+<Badge color={{施工中:"blue",設計中:"yellow",驗收中:"green",完工:"green",報價中:"gray"}[p.status]||"gray"}>{p.status}</Badge>
 <span className="text-stone-500 font-medium">{p.progress||0}%</span>
 </div>
 </div>
@@ -3958,7 +3960,7 @@ className={"w-full text-left rounded-2xl p-4 border shadow-sm transition-all "+(
 <div className="font-semibold text-stone-800 text-sm truncate">{p.name}</div>
 <div className="text-xs text-stone-400 mt-0.5">{p.address || "📍 尚未設定地址"}</div>
 </div>
-<Badge color={{"施工中":"blue","設計中":"yellow","驗收中":"green","完工":"green","報價中":"gray"}[p.status]||"gray"}>{p.status}</Badge>
+<Badge color={{施工中:"blue",設計中:"yellow",驗收中:"green",完工:"green",報價中:"gray"}[p.status]||"gray"}>{p.status}</Badge>
 </div>
 {selected?.id === p.id && p.address && (
 <div className="mt-3 space-y-2" onClick={e=>e.stopPropagation()}>
