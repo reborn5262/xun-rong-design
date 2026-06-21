@@ -118,7 +118,6 @@ const NAV_SECTIONS = [
 { label: "DASHBOARD", items: [
 { icon: "⊞", label: "工作面板", id: "dashboard" },
 { icon: "≡", label: "所有任務", id: "tasks" },
-{ icon: "📅", label: "行事曆", id: "calendar" },
 { icon: "📋", label: "預約總覽", id: "appointments" },
 ]},
 { label: "客戶與排程", items: [
@@ -162,7 +161,6 @@ const NAV_SECTIONS = [
 { icon: "🧾", label: "報銷申請", id: "expense" },
 { icon: "💳", label: "薪資計算", id: "payroll" },
 { icon: "🐷", label: "月度支出", id: "monthly" },
-{ icon: "📈", label: "財務預測", id: "forecast" },
 ]},
 { label: "人事管理", items: [
 { icon: "⏱", label: "出勤記錄", id: "attendance" },
@@ -175,7 +173,6 @@ const NAV_SECTIONS = [
 { icon: "🔗", label: "備料追蹤", id: "tracking" },
 ]},
 { label: "經營分析", items: [
-{ icon: "📈", label: "利潤分析", id: "profit" },
 { icon: "⚠", label: "異常損失", id: "losses" },
 ]},
 { label: "分析與管理", items: [
@@ -195,6 +192,25 @@ function getProjectOpts(projects) {
 const names = (projects||[]).map(p=>p.name).filter(Boolean);
 const merged = [...new Set([...names, "公司內部"])];
 return ["", ...merged];
+}
+// 統一計算公司整體資金狀況：彙整帳本(ledger)收支 + 已發薪資 + 已核准/已撥款報銷 + 已採購/已到貨的採購單 + 每月固定支出
+function getCompanyFinance({ ledger=[], payroll=[], expense=[], purchase=[], monthly=[] }) {
+const ledgerIncome = ledger.filter(i=>i.type==="收入").reduce((s,i)=>s+Number(i.amount||0),0);
+const ledgerExpense = ledger.filter(i=>i.type==="支出").reduce((s,i)=>s+Number(i.amount||0),0);
+const payrollExpense = payroll.filter(i=>i.status==="已發").reduce((s,i)=>s+(Number(i.baseSalary||0)+Number(i.bonus||0)-Number(i.deduction||0)),0);
+const expenseExpense = expense.filter(i=>i.status==="已核准"||i.status==="已撥款").reduce((s,i)=>s+Number(i.amount||0),0);
+const purchaseExpense = purchase.filter(i=>i.status==="已採購"||i.status==="已到貨").reduce((s,i)=>s+Number(i.qty||1)*Number(i.price||0),0);
+const monthlyExpenseTotal = monthly.reduce((s,i)=>s+Number(i.amount||0),0);
+const totalIncome = ledgerIncome;
+const totalExpense = ledgerExpense + payrollExpense + expenseExpense + purchaseExpense + monthlyExpenseTotal;
+const profit = totalIncome - totalExpense;
+const margin = totalIncome>0 ? ((profit/totalIncome)*100).toFixed(1) : 0;
+return {
+totalIncome, totalExpense, profit, margin,
+breakdown: {
+ledgerIncome, ledgerExpense, payrollExpense, expenseExpense, purchaseExpense, monthlyExpenseTotal,
+}
+};
 }
 const SC = { "施工中":"blue","設計中":"yellow","驗收中":"green","報價中":"gray","完工":"green","待審":"yellow","已核准":"green","已拒絕":"red","進行中":"blue","已完成":"green","草稿":"gray","確認中":"blue","已確認":"green","取消":"red" };
 
@@ -395,57 +411,6 @@ return (
 );
 }
 
-function Calendar({ tasks }) {
-const today = new Date();
-const [year, setYear] = useState(today.getFullYear());
-const [month, setMonth] = useState(today.getMonth());
-const firstDay = new Date(year,month,1).getDay();
-const daysInMonth = new Date(year,month+1,0).getDate();
-const mNames = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
-const taskDays = new Set(tasks.map(t=>{
-if(!t.due)return null;
-const d = new Date(t.due);
-return(d.getFullYear()===year&&d.getMonth()===month)?d.getDate():null;
-}).filter(Boolean));
-return (
-<div className="space-y-3">
-<div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100">
-<div className="flex justify-between items-center mb-4">
-<button onClick={()=>{if(month===0){setMonth(11);setYear(y=>y-1)}else setMonth(m=>m-1);}} className="w-8 h-8 flex items-center justify-center text-stone-400 text-xl">‹</button>
-<span className="text-sm font-semibold text-stone-700">{year}年 {mNames[month]}</span>
-<button onClick={()=>{if(month===11){setMonth(0);setYear(y=>y+1)}else setMonth(m=>m+1);}} className="w-8 h-8 flex items-center justify-center text-stone-400 text-xl">›</button>
-</div>
-<div className="grid grid-cols-7 text-center mb-2">
-{["日","一","二","三","四","五","六"].map(d=><div key={d} className="text-xs text-stone-400 py-1">{d}</div>)}
-</div>
-<div className="grid grid-cols-7 text-center gap-y-1">
-{Array(firstDay).fill(null).map((_,i)=><div key={"e"+(i)}></div>)}
-{Array(daysInMonth).fill(null).map((_,i)=>{
-const day=i+1;
-const isToday=day===today.getDate()&&month===today.getMonth()&&year===today.getFullYear();
-return(
-<div key={day} className="flex flex-col items-center py-1">
-<div className={"w-7 h-7 flex items-center justify-center rounded-full text-sm "+(isToday?"bg-stone-800 text-white font-bold":"")}>{day}</div>
-{taskDays.has(day)&&<div className="w-1 h-1 bg-red-400 rounded-full mt-0.5"></div>}
-</div>
-);
-})}
-</div>
-</div>
-<div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100">
-<div className="text-xs text-stone-400 mb-3">本月有截止日的任務</div>
-{tasks.filter(t=>{if(!t.due)return false;const d=new Date(t.due);return d.getFullYear()===year&&d.getMonth()===month;}).map(t=>(
-<div key={t.id} className="flex items-center gap-3 mb-2 last:mb-0">
-<div className={"w-2 h-2 rounded-full "+(t.done?"bg-green-400":"bg-red-400")}></div>
-<div className="flex-1 text-sm text-stone-700 truncate">{t.title}</div>
-<span className="text-xs text-stone-400">{t.due}</span>
-</div>
-))}
-</div>
-</div>
-);
-}
-
 function mkPage(fields, addLabel, renderItem) {
 return function Page({ items, setItems }) {
 const [modal, setModal] = useState(false);
@@ -585,6 +550,12 @@ renderItem={p=>(
 );
 }
 
+function FormField({ f, form, setForm }) {
+if(f.type==="sel")return<Sel label={f.label} options={f.opts} value={form[f.key]} onChange={e=>setForm({...form,[f.key]:e.target.value})}/>;
+if(f.type==="txt")return<Txt label={f.label} placeholder={f.ph||""} value={form[f.key]} onChange={e=>setForm({...form,[f.key]:e.target.value})}/>;
+if(f.type==="range")return<div><label className="text-xs text-stone-400 mb-1 block">{f.label} {form[f.key]}%</label><input type="range" min="0" max="100" className="w-full" value={form[f.key]} onChange={e=>setForm({...form,[f.key]:Number(e.target.value)})}/></div>;
+return<Inp label={f.label} type={f.it||"text"} placeholder={f.ph||""} value={form[f.key]} onChange={e=>setForm({...form,[f.key]:e.target.value})}/>;
+}
 function SimpleForm({ title, fields, items, setItems, addLabel, renderItem }) {
 const [modal, setModal] = useState(false);
 const [edit, setEdit] = useState(null);
@@ -598,20 +569,14 @@ if(edit)setItems(p=>p.map(i=>i.id===edit.id?{...i,...form}:i));
 else setItems(p=>[{...form,id:Date.now()},...p]);
 setModal(false);
 };
-const F=({f})=>{
-if(f.type==="sel")return<Sel label={f.label} options={f.opts} value={form[f.key]} onChange={e=>setForm({...form,[f.key]:e.target.value})}/>;
-if(f.type==="txt")return<Txt label={f.label} placeholder={f.ph||""} value={form[f.key]} onChange={e=>setForm({...form,[f.key]:e.target.value})}/>;
-if(f.type==="range")return<div><label className="text-xs text-stone-400 mb-1 block">{f.label} {form[f.key]}%</label><input type="range" min="0" max="100" className="w-full" value={form[f.key]} onChange={e=>setForm({...form,[f.key]:Number(e.target.value)})}/></div>;
-return<Inp label={f.label} type={f.it||"text"} placeholder={f.ph||""} value={form[f.key]} onChange={e=>setForm({...form,[f.key]:e.target.value})}/>;
-};
 return(
 <>
 <ListPage items={items} onAdd={()=>open()} onEdit={open} onDelete={id=>setItems(p=>p.filter(i=>i.id!==id))} addLabel={addLabel} renderItem={renderItem}/>
 {modal&&<Modal title={edit?"編輯":addLabel} onClose={()=>setModal(false)}>
 <div className="space-y-3">
 {fields.map((f,i)=>{
-if(f.grid)return<div key={i} className={"grid grid-cols-"+(f.grid)+" gap-2"}>{f.children.map((c,j)=><F key={j} f={c}/>)}</div>;
-return<F key={i} f={f}/>;
+if(f.grid)return<div key={i} className={"grid grid-cols-"+(f.grid)+" gap-2"}>{f.children.map((c,j)=><FormField key={j} f={c} form={form} setForm={setForm}/>)}</div>;
+return<FormField key={i} f={f} form={form} setForm={setForm}/>;
 })}
 </div>
 <Btn onClick={save} label={edit?"儲存":"新增"}/>
@@ -986,39 +951,6 @@ renderItem={i=>(
 );
 }
 
-function Forecast({ ledger, projects }) {
-const income=ledger.filter(i=>i.type==="收入").reduce((s,i)=>s+Number(i.amount||0),0);
-const expense=ledger.filter(i=>i.type==="支出").reduce((s,i)=>s+Number(i.amount||0),0);
-const profit=income-expense;
-const margin=income>0?((profit/income)*100).toFixed(1):0;
-return(
-<div className="space-y-4">
-<div className="grid grid-cols-2 gap-3">
-{[["累計收入","NT$"+income.toLocaleString(),"text-emerald-600"],["累計支出","NT$"+expense.toLocaleString(),"text-red-500"],["淨利潤","NT$"+profit.toLocaleString(),profit>=0?"text-stone-800":"text-red-500"],["利潤率",margin+"%",Number(margin)>=20?"text-emerald-600":Number(margin)>=10?"text-yellow-500":"text-red-500"]].map(([l,v,c])=>(
-<div key={l} className="bg-white rounded-2xl p-4 border border-stone-100 shadow-sm">
-<div className="text-xs text-stone-400 mb-1">{l}</div>
-<div className={"text-lg font-bold "+(c)}>{v}</div>
-</div>
-))}
-</div>
-<div className="bg-white rounded-2xl p-4 border border-stone-100 shadow-sm">
-<div className="text-xs text-stone-400 mb-3">營運概況</div>
-{[["進行中專案",projects.filter(p=>p.status!=="完工").length+" 個","blue"],["完工專案",projects.filter(p=>p.status==="完工").length+" 個","green"],["總帳本筆數",ledger.length+" 筆","gray"]].map(([l,v,c])=>(
-<div key={l} className="flex justify-between items-center mb-2 last:mb-0">
-<span className="text-sm text-stone-600">{l}</span><Badge color={c}>{v}</Badge>
-</div>
-))}
-</div>
-<div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-<div className="text-xs text-amber-600 font-medium mb-1">💡 財務建議</div>
-<div className="text-xs text-amber-700">
-{Number(margin)<10?"利潤率偏低，建議檢視成本結構或提高報價。":Number(margin)<20?"利潤率尚可，持續監控各項支出。":"財務狀況健康，繼續保持！"}
-</div>
-</div>
-</div>
-);
-}
-
 function Attendance({ items, setItems }) {
 const todayStr=new Date().toLocaleDateString("zh-TW");
 const rec=items.find(i=>i.date===todayStr);
@@ -1167,30 +1099,6 @@ renderItem={i=>(
 <div className="text-xs text-stone-500 mt-1">需求：{i.qty} {i.unit} · {i.needDate}</div>
 </>
 )}/>;
-}
-
-function Profit({ ledger, projects }) {
-const projectNames = [...new Set([(projects||[]).map(p=>p.name), ...ledger.map(i=>i.project)].flat().filter(Boolean))];
-const byProject=projectNames.map(name=>{
-const inc=ledger.filter(i=>i.project===name&&i.type==="收入").reduce((s,i)=>s+Number(i.amount||0),0);
-const exp=ledger.filter(i=>i.project===name&&i.type==="支出").reduce((s,i)=>s+Number(i.amount||0),0);
-return{name,income:inc,expense:exp,profit:inc-exp};
-}).filter(p=>p.income>0||p.expense>0);
-return(
-<div className="space-y-3">
-{byProject.length===0&&<div className="text-center text-stone-400 py-12 text-sm">請先在帳本新增收支資料</div>}
-{byProject.map((p,i)=>(
-<div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100">
-<div className="font-semibold text-stone-800 text-sm mb-3">{p.name}</div>
-<div className="grid grid-cols-3 gap-2 text-center">
-{[["收入","NT$"+p.income.toLocaleString(),"text-emerald-600"],["支出","NT$"+p.expense.toLocaleString(),"text-red-500"],["利潤","NT$"+p.profit.toLocaleString(),p.profit>=0?"text-stone-800":"text-red-500"]].map(([l,v,c])=>(
-<div key={l}><div className="text-xs text-stone-400 mb-1">{l}</div><div className={"text-sm font-bold "+(c)}>{v}</div></div>
-))}
-</div>
-</div>
-))}
-</div>
-);
 }
 
 function Losses({ items, setItems, projects }) {
@@ -1851,9 +1759,12 @@ const [modal, setModal] = useState(false);
 const [edit, setEdit] = useState(null);
 const blank = {title:"",project:"",worker:"",type:"施工",startDate:"",endDate:"",startTime:"",endTime:"",color:"blue",note:""};
 const [form, setForm] = useState(blank);
-const [viewMonth, setViewMonth] = useState(new Date().getMonth());
-const [viewYear, setViewYear] = useState(new Date().getFullYear());
-const open=(item=null)=>{setEdit(item);setForm(item||blank);setModal(true);};
+const today=new Date();
+const [viewMonth, setViewMonth] = useState(today.getMonth());
+const [viewYear, setViewYear] = useState(today.getFullYear());
+const todayStr = today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
+const [selectedDate, setSelectedDate] = useState(todayStr);
+const open=(item=null)=>{setEdit(item);setForm(item||{...blank,startDate:selectedDate,endDate:selectedDate});setModal(true);};
 const save=()=>{
 if(!form.title.trim())return;
 if(edit)setItems(p=>p.map(i=>i.id===edit.id?{...i,...form}:i));
@@ -1861,7 +1772,6 @@ else setItems(p=>[{...form,id:Date.now()},...p]);
 setModal(false);
 };
 
-const today=new Date();
 const firstDay=new Date(viewYear,viewMonth,1).getDay();
 const daysInMonth=new Date(viewYear,viewMonth+1,0).getDate();
 const mNames=["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
@@ -1884,6 +1794,12 @@ conflicts.push({a:a.title,b:b.title,worker:a.worker});
 }
 }
 
+const selectedItems = items.filter(i=>i.startDate<=selectedDate&&i.endDate>=selectedDate);
+const selectedDateLabel = (() => {
+const [y,m,d] = selectedDate.split("-").map(Number);
+return y+"年"+m+"月"+d+"日"+(selectedDate===todayStr?"（今天）":"");
+})();
+
 return(
 <div className="space-y-3">
 {conflicts.length>0&&(
@@ -1905,23 +1821,25 @@ return(
 {Array(firstDay).fill(null).map((_,i)=><div key={"e"+(i)}></div>)}
 {Array(daysInMonth).fill(null).map((_,i)=>{
 const day=i+1;
-const isToday=day===today.getDate()&&viewMonth===today.getMonth()&&viewYear===today.getFullYear();
+const dateStr=viewYear+"-"+String(viewMonth+1).padStart(2,"0")+"-"+String(day).padStart(2,"0");
+const isToday=dateStr===todayStr;
+const isSelected=dateStr===selectedDate;
 const evts=getEventsForDay(day);
 return(
-<div key={day} className="flex flex-col items-center">
-<div className={"w-7 h-7 flex items-center justify-center rounded-full text-xs "+(isToday?"bg-stone-800 text-white font-bold":"")}>{day}</div>
-{evts.slice(0,2).map(e=><div key={e.id} className={"w-full text-[9px] rounded px-0.5 truncate mt-0.5 "+(typeColor[e.type]||"bg-stone-200")}>{e.title}</div>)}
-{evts.length>2&&<div className="text-[9px] text-stone-400">+{evts.length-2}</div>}
-</div>
+<button key={day} onClick={()=>setSelectedDate(dateStr)} className="flex flex-col items-center">
+<div className={"w-7 h-7 flex items-center justify-center rounded-full text-xs "+(isSelected?"bg-stone-800 text-white font-bold":isToday?"bg-stone-200 text-stone-800 font-bold":"")}>{day}</div>
+{evts.length>0&&<div className="w-1 h-1 bg-red-400 rounded-full mt-0.5"></div>}
+</button>
 );
 })}
 </div>
 </div>
 <div className="flex justify-between items-center">
-<span className="text-sm text-stone-400">共 {items.length} 筆排程</span>
+<span className="text-sm font-medium text-stone-600">{selectedDateLabel}</span>
 <button onClick={()=>open()} className="text-xs bg-stone-800 text-white px-3 py-1.5 rounded-lg">＋ 新增排程</button>
 </div>
-{items.sort((a,b)=>a.startDate>b.startDate?1:-1).slice(0,10).map(i=>(
+{selectedItems.length===0&&<div className="text-center text-stone-400 py-12 text-sm">這天沒有排程</div>}
+{selectedItems.sort((a,b)=>a.startDate>b.startDate?1:-1).map(i=>(
 <div key={i.id} className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100">
 <div className="flex justify-between items-start mb-1">
 <div className="font-semibold text-stone-800 text-sm">{i.title}</div>
@@ -3110,7 +3028,7 @@ return(
 
 
 // ─── Visual Dashboard ─────────────────────────────────────────────
-function VisualDashboard({ projects, tasks, ledger, attendance }) {
+function VisualDashboard({ projects, tasks, ledger, attendance, payroll=[], expense=[], purchase=[], monthly=[] }) {
 const months = [];
 for(let i=5;i>=0;i--){
 const d = new Date();
@@ -3122,9 +3040,14 @@ const monthLabel = m => m.slice(5)+"月";
 const monthlyIncome = months.map(m =>
 ledger.filter(i=>i.type==="收入"&&i.date?.slice(0,7)===m).reduce((s,i)=>s+Number(i.amount||0),0)
 );
-const monthlyExpense = months.map(m =>
-ledger.filter(i=>i.type==="支出"&&i.date?.slice(0,7)===m).reduce((s,i)=>s+Number(i.amount||0),0)
-);
+const monthlyExpense = months.map(m => {
+const ledgerExp = ledger.filter(i=>i.type==="支出"&&i.date?.slice(0,7)===m).reduce((s,i)=>s+Number(i.amount||0),0);
+const payrollExp = payroll.filter(i=>i.status==="已發"&&i.month===m).reduce((s,i)=>s+(Number(i.baseSalary||0)+Number(i.bonus||0)-Number(i.deduction||0)),0);
+const expExp = expense.filter(i=>(i.status==="已核准"||i.status==="已撥款")&&i.date?.slice(0,7)===m).reduce((s,i)=>s+Number(i.amount||0),0);
+const purExp = purchase.filter(i=>(i.status==="已採購"||i.status==="已到貨")&&i.date?.slice(0,7)===m).reduce((s,i)=>s+Number(i.qty||1)*Number(i.price||0),0);
+const monExp = monthly.filter(i=>i.month===m).reduce((s,i)=>s+Number(i.amount||0),0);
+return ledgerExp+payrollExp+expExp+purExp+monExp;
+});
 
 const statusCounts = {};
 projects.forEach(p=>{ statusCounts[p.status]=(statusCounts[p.status]||0)+1; });
@@ -3136,10 +3059,8 @@ const taskRate = totalTasks>0?Math.round(doneTasks/totalTasks*100):0;
 
 const maxVal = Math.max(...monthlyIncome,...monthlyExpense,1);
 
-const totalIncome = ledger.filter(i=>i.type==="收入").reduce((s,i)=>s+Number(i.amount||0),0);
-const totalExpense = ledger.filter(i=>i.type==="支出").reduce((s,i)=>s+Number(i.amount||0),0);
-const profit = totalIncome - totalExpense;
-const margin = totalIncome>0?((profit/totalIncome)*100).toFixed(1):0;
+const fin = getCompanyFinance({ ledger, payroll, expense, purchase, monthly });
+const { totalIncome, totalExpense, profit, margin } = fin;
 
 return(
 <div className="space-y-4">
@@ -3154,6 +3075,20 @@ return(
 <div key={l} className="bg-white rounded-2xl p-4 border border-stone-100 shadow-sm">
 <div className="text-xs text-stone-400 mb-1">{l}</div>
 <div className={"text-2xl font-bold "+(c)}>{v}</div>
+</div>
+))}
+</div>
+
+{/* Company Finance Breakdown */}
+<div className="bg-white rounded-2xl p-4 border border-stone-100 shadow-sm">
+<div className="text-xs text-stone-400 mb-3 font-medium">公司整體資金狀況</div>
+<div className="flex justify-between items-center mb-3">
+<span className="text-sm text-stone-600">淨利潤</span>
+<span className={"text-lg font-bold "+(profit>=0?"text-stone-800":"text-red-500")}>NT${profit.toLocaleString()}</span>
+</div>
+{[["帳本支出",fin.breakdown.ledgerExpense],["已發薪資",fin.breakdown.payrollExpense],["已核准報銷",fin.breakdown.expenseExpense],["已採購/到貨",fin.breakdown.purchaseExpense],["每月固定支出",fin.breakdown.monthlyExpenseTotal]].map(([l,v])=>(
+<div key={l} className="flex justify-between items-center mb-1.5 last:mb-0">
+<span className="text-xs text-stone-500">{l}</span><span className="text-xs font-medium text-stone-600">NT${v.toLocaleString()}</span>
 </div>
 ))}
 </div>
@@ -3240,11 +3175,51 @@ return(
 ))}
 </div>
 )}
+{/* Per-project profit */}
+{(() => {
+const projectNames = [...new Set([
+(projects||[]).map(p=>p.name),
+ledger.map(i=>i.project),
+expense.map(i=>i.project),
+purchase.map(i=>i.project),
+].flat().filter(Boolean))];
+const byProject = projectNames.map(name=>{
+const inc = ledger.filter(i=>i.project===name&&i.type==="收入").reduce((s,i)=>s+Number(i.amount||0),0);
+const ledgerExp = ledger.filter(i=>i.project===name&&i.type==="支出").reduce((s,i)=>s+Number(i.amount||0),0);
+const expExp = expense.filter(i=>i.project===name&&(i.status==="已核准"||i.status==="已撥款")).reduce((s,i)=>s+Number(i.amount||0),0);
+const purExp = purchase.filter(i=>i.project===name&&(i.status==="已採購"||i.status==="已到貨")).reduce((s,i)=>s+Number(i.qty||1)*Number(i.price||0),0);
+const exp = ledgerExp+expExp+purExp;
+return{name,income:inc,expense:exp,profit:inc-exp};
+}).filter(p=>p.income>0||p.expense>0);
+return byProject.length>0 && (
+<div className="bg-white rounded-2xl p-4 border border-stone-100 shadow-sm">
+<div className="text-xs text-stone-400 mb-3 font-medium">各專案利潤</div>
+<div className="space-y-3">
+{byProject.map((p,i)=>(
+<div key={i} className="border-b border-stone-100 pb-3 last:border-0 last:pb-0">
+<div className="font-semibold text-stone-800 text-sm mb-2">{p.name}</div>
+<div className="grid grid-cols-3 gap-2 text-center">
+{[["收入","NT$"+p.income.toLocaleString(),"text-emerald-600"],["支出","NT$"+p.expense.toLocaleString(),"text-red-500"],["利潤","NT$"+p.profit.toLocaleString(),p.profit>=0?"text-stone-800":"text-red-500"]].map(([l,v,c])=>(
+<div key={l}><div className="text-xs text-stone-400 mb-1">{l}</div><div className={"text-sm font-bold "+(c)}>{v}</div></div>
+))}
+</div>
+</div>
+))}
+</div>
+</div>
+);
+})()}
+
+{/* Financial advice */}
+<div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+<div className="text-xs text-amber-600 font-medium mb-1">💡 財務建議</div>
+<div className="text-xs text-amber-700">
+{Number(margin)<10?"利潤率偏低，建議檢視成本結構或提高報價。":Number(margin)<20?"利潤率尚可，持續監控各項支出。":"財務狀況健康，繼續保持！"}
+</div>
+</div>
 </div>
 );
 }
-
-// ─── Suppliers ────────────────────────────────────────────────────
 function Suppliers({ items, setItems }) {
 const [modal, setModal] = useState(false);
 const [edit, setEdit] = useState(null);
@@ -3915,7 +3890,7 @@ designer: {
 label: "設計師",
 icon: "🎨",
 color: "bg-purple-600 text-white",
-pages: ["dashboard","tasks","calendar","appointments","clients","schedule",
+pages: ["dashboard","tasks","appointments","clients","schedule",
 "inquiries","projects","album","contracts","quotes","quickquote",
 "inspection","acceptance","pending","knowledge","lighting","design",
 "tiles","reports","palette","gantt","comms","reminders","clientprogress",
@@ -3925,7 +3900,7 @@ assistant: {
 label: "助理",
 icon: "📋",
 color: "bg-blue-600 text-white",
-pages: ["dashboard","tasks","calendar","appointments","schedule",
+pages: ["dashboard","tasks","appointments","schedule",
 "inquiries","projects","album","inspection","acceptance","pending",
 "attendance","leave","overtime","materials","inventory","tracking",
 "purchase","expense","checklist","paymenttrack","sitemap"],
@@ -4082,7 +4057,6 @@ selectedRole === "assistant" ? "預設密碼：assistant" : "預設密碼：work
 const ALL_PAGES = [
 { id:"dashboard", label:"工作面板", group:"主要" },
 { id:"tasks", label:"所有任務", group:"主要" },
-{ id:"calendar", label:"行事曆", group:"主要" },
 { id:"appointments", label:"預約總覽", group:"主要" },
 { id:"clients", label:"客戶管理", group:"客戶與排程" },
 { id:"schedule", label:"智慧排程", group:"客戶與排程" },
@@ -4110,7 +4084,6 @@ const ALL_PAGES = [
 { id:"expense", label:"報銷申請", group:"財務管理" },
 { id:"payroll", label:"薪資計算", group:"財務管理" },
 { id:"monthly", label:"月度支出", group:"財務管理" },
-{ id:"forecast", label:"財務預測", group:"財務管理" },
 { id:"paymenttrack", label:"收款追蹤", group:"財務管理" },
 { id:"attendance", label:"出勤記錄", group:"人事管理" },
 { id:"leave", label:"假單管理", group:"人事管理" },
@@ -4126,7 +4099,6 @@ const ALL_PAGES = [
 { id:"sitemap", label:"工地地圖", group:"分析與管理" },
 { id:"suppliers", label:"廠商管理", group:"分析與管理" },
 { id:"checklist", label:"標準工程清單", group:"分析與管理" },
-{ id:"profit", label:"利潤分析", group:"經營分析" },
 { id:"losses", label:"異常損失", group:"經營分析" },
 { id:"settings", label:"系統設定", group:"系統" },
 ];
@@ -4317,8 +4289,6 @@ purchase: { label:"採購申請單", icon:"💵" },
 expense: { label:"報銷申請", icon:"🧾" },
 payroll: { label:"薪資計算", icon:"💳" },
 monthly: { label:"月度支出", icon:"🐷" },
-forecast: { label:"財務預測", icon:"📈" },
-profit: { label:"利潤分析", icon:"📈" },
 losses: { label:"異常損失", icon:"⚠" },
 settings: { label:"系統設定", icon:"⚙" },
 };
@@ -4364,6 +4334,7 @@ autoFocus/>
 <button onClick={() => setShowPw(!showPw)} className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 text-sm">
 {showPw ? "隱藏" : "顯示"}
 </button>
+</div>
 {error && <div className="text-center text-red-500 text-sm font-medium">密碼錯誤，請再試一次</div>}
 <button onClick={tryUnlock} className="w-full bg-stone-800 text-white rounded-2xl py-3.5 font-medium text-sm">
 解鎖
@@ -4373,7 +4344,6 @@ autoFocus/>
 </button>
 </div>
 <div className="text-xs text-stone-300 text-center">預設密碼可在系統設定中更改</div>
-</div>
 </div>
 );
 }
@@ -4471,7 +4441,6 @@ const renderPage=()=>{
 switch(activeId){
 case "dashboard": return (<Dashboard tasks={tasks} projects={projects} attendance={attendance} setActiveId={setActiveId}/>);
 case "tasks": return (<Tasks tasks={tasks} setTasks={setTasks} projects={projects}/>);
-case "calendar": return (<Calendar tasks={tasks}/>);
 case "quickquote": return (<QuickQuote items={quickquotes} setItems={setQuickquotes}/>);
 case "clients": return (<Clients items={clients} setItems={setClients}/>);
 case "schedule": return (<Schedule items={schedule} setItems={setSchedule} projects={projects}/>);
@@ -4485,7 +4454,7 @@ case "pricecompare": return (<PriceCompare items={pricecompare} setItems={setPri
 case "estimator": return (<CostEstimator/>);
 case "caselibrary": return (<CaseLibrary items={caselibrary} setItems={setCaselibrary}/>);
 case "clientprogress": return (<ClientProgress projects={projects} tasks={tasks} album={album} schedule={schedule}/>);
-case "visualdash": return (<VisualDashboard projects={projects} tasks={tasks} ledger={ledger} attendance={attendance}/>);
+case "visualdash": return (<VisualDashboard projects={projects} tasks={tasks} ledger={ledger} attendance={attendance} payroll={payroll} expense={expense} purchase={purchase} monthly={monthly}/>);
 case "suppliers": return (<Suppliers items={suppliers} setItems={setSuppliers}/>);
 case "checklist": return (<StandardChecklist items={checklist} setItems={setChecklist}/>);
 case "paymenttrack": return (<PaymentTracker items={paymenttrack} setItems={setPaymenttrack} projects={projects} ledger={ledger}/>);
@@ -4508,14 +4477,12 @@ case "purchase": return (<Purchase items={purchase} setItems={setPurchase} proje
 case "expense": return (<Expense items={expense} setItems={setExpense} projects={projects}/>);
 case "payroll": return (<Payroll items={payroll} setItems={setPayroll}/>);
 case "monthly": return (<Monthly items={monthly} setItems={setMonthly}/>);
-case "forecast": return (<Forecast ledger={ledger} projects={projects}/>);
 case "attendance": return (<Attendance items={attendance} setItems={setAttendance}/>);
 case "leave": return (<Leave items={leave} setItems={setLeave}/>);
 case "overtime": return (<Overtime items={overtime} setItems={setOvertime} projects={projects}/>);
 case "materials": return (<Materials items={materials} setItems={setMaterials}/>);
 case "inventory": return (<Inventory items={inventory} setItems={setInventory}/>);
 case "tracking": return (<Tracking items={tracking} setItems={setTracking} projects={projects}/>);
-case "profit": return (<Profit ledger={ledger} projects={projects}/>);
 case "losses": return (<Losses items={losses} setItems={setLosses} projects={projects}/>);
 case "settings": return (<Settings onClearAll={clearAll} rolePasswords={rolePasswords} setRolePasswords={setRolePasswords} customRoles={customRoles} setCustomRoles={setCustomRoles} hiddenPages={hiddenPages} setHiddenPages={setHiddenPages} companyInfo={companyInfo} setCompanyInfo={setCompanyInfo} notifSettings={notifSettings} setNotifSettings={setNotifSettings} menuCustom={menuCustom} setMenuCustom={setMenuCustom} appPassword={appPassword} setAppPassword={setAppPassword}/>);
 default: return (<div className="text-center text-stone-400 py-16 text-sm">🔧 功能開發中</div>);
