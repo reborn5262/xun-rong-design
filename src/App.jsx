@@ -1129,7 +1129,7 @@ renderItem={i=>(
 );
 }
 
-function Settings({ onClearAll, appPassword, setAppPassword, companyInfo, setCompanyInfo, notifSettings, setNotifSettings, menuCustom, setMenuCustom, rolePasswords, setRolePasswords, customRoles, setCustomRoles, hiddenPages, setHiddenPages }) {
+function Settings({ onClearAll, appPassword, setAppPassword, companyInfo, setCompanyInfo, notifSettings, setNotifSettings, menuCustom, setMenuCustom, rolePasswords, setRolePasswords, customRoles, setCustomRoles, hiddenPages, setHiddenPages, lockedPages, setLockedPages }) {
 const [confirm, setConfirm] = useState(false);
 const [pwForm, setPwForm] = useState({current:"",newPw:"",confirm:""});
 const [pwError, setPwError] = useState("");
@@ -1181,11 +1181,27 @@ onChange={e=>setRolePasswords(p=>({...p,[key]:e.target.value}))}/>
 {/* Password */}
 <SettingsSection title="密碼與權限管理" icon="🔐" defaultOpen={true}>
 <div className="mt-3 space-y-3">
-<div className="bg-stone-50 rounded-xl p-3 text-xs text-stone-500">
-<div className="font-medium text-stone-600 mb-2">🔒 以下功能需密碼存取：</div>
-{Object.entries(PROTECTED_PAGES).map(([id,p])=>(
-<div key={id} className="flex items-center gap-2 mb-1"><span>{p.icon}</span><span>{p.label}</span></div>
-))}
+<div className="bg-stone-50 rounded-xl p-3">
+<div className="font-medium text-stone-600 mb-2 text-xs">🔒 勾選需要密碼才能存取的功能：</div>
+<div className="grid grid-cols-2 gap-1.5 max-h-72 overflow-y-auto pr-1">
+{Object.entries(ALL_LOCKABLE_PAGES).map(([id,p])=>{
+const checked = lockedPages.includes(id);
+return (
+<label key={id} className="flex items-center gap-1.5 text-xs text-stone-600 py-1 px-1.5 rounded-lg active:bg-stone-100">
+<input type="checkbox" checked={checked}
+onChange={()=>setLockedPages(p=>checked?p.filter(x=>x!==id):[...p,id])}
+className="w-3.5 h-3.5 flex-shrink-0"/>
+<span className="flex-shrink-0">{p.icon}</span>
+<span className="truncate">{p.label}</span>
+</label>
+);
+})}
+</div>
+<div className="flex gap-2 mt-3">
+<button onClick={()=>setLockedPages(Object.keys(ALL_LOCKABLE_PAGES))} className="flex-1 text-xs bg-stone-200 text-stone-600 rounded-lg py-1.5">全選</button>
+<button onClick={()=>setLockedPages([])} className="flex-1 text-xs bg-stone-200 text-stone-600 rounded-lg py-1.5">全部取消</button>
+<button onClick={()=>setLockedPages(DEFAULT_LOCKED_PAGES)} className="flex-1 text-xs bg-stone-200 text-stone-600 rounded-lg py-1.5">恢復預設</button>
+</div>
 </div>
 <input type="password" className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm" placeholder="目前密碼" value={pwForm.current} onChange={e=>setPwForm({...pwForm,current:e.target.value})}/>
 <input type="password" className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm" placeholder="新密碼（至少4位）" value={pwForm.newPw} onChange={e=>setPwForm({...pwForm,newPw:e.target.value})}/>
@@ -1196,6 +1212,7 @@ onChange={e=>setRolePasswords(p=>({...p,[key]:e.target.value}))}/>
 <div className="text-xs text-stone-300 text-center">預設密碼：1234</div>
 </div>
 </SettingsSection>
+
 
 {/* Company Info */}
 <SettingsSection title="公司基本資料" icon="🏢">
@@ -4282,22 +4299,58 @@ placeholder="角色名稱，例：工地主任" value={newRoleName} onChange={e=
 }
 
 // ─── Permission System ──────────────────────────────────────────
-const PROTECTED_PAGES = {
+// 所有可被鎖定的頁面（使用者可在系統設定中自由勾選要鎖住哪些）
+const ALL_LOCKABLE_PAGES = {
+appointments: { label:"預約總覽", icon:"📋" },
 clients: { label:"客戶管理", icon:"👥" },
+schedule: { label:"智慧排程", icon:"🗓" },
+inquiries: { label:"諮詢單管理", icon:"📝" },
+projects: { label:"專案總覽", icon:"🏠" },
+album: { label:"專案相簿", icon:"📸" },
+contracts: { label:"合約管理", icon:"📄" },
+quotes: { label:"報價單", icon:"💰" },
+quickquote: { label:"初步報價", icon:"📋" },
+inspection: { label:"工程檢核", icon:"🔍" },
+acceptance: { label:"工程驗收", icon:"✅" },
+pending: { label:"待客戶確認", icon:"👤" },
+knowledge: { label:"知識文件庫", icon:"📚" },
+lighting: { label:"燈光設計", icon:"💡" },
+design: { label:"設計提案", icon:"🖥" },
+workers: { label:"師傅通訊錄", icon:"👷" },
+comms: { label:"客戶溝通紀錄", icon:"💬" },
+reminders: { label:"生日/週年提醒", icon:"🔔" },
+clientprogress:{ label:"客戶進度頁", icon:"🔗" },
+pricecompare: { label:"材料比價", icon:"📦" },
+estimator: { label:"估價計算機", icon:"🧮" },
+caselibrary: { label:"完工案例庫", icon:"⭐" },
 ledger: { label:"公司帳本", icon:"📒" },
 purchase: { label:"採購申請單", icon:"💵" },
 expense: { label:"報銷申請", icon:"🧾" },
 payroll: { label:"薪資計算", icon:"💳" },
 monthly: { label:"月度支出", icon:"🐷" },
+attendance: { label:"出勤記錄", icon:"⏱" },
+leave: { label:"假單管理", icon:"📄" },
+overtime: { label:"加班申請", icon:"⏰" },
+materials: { label:"建材庫", icon:"📦" },
+inventory: { label:"物料庫存", icon:"📦" },
+tracking: { label:"備料追蹤", icon:"🔗" },
 losses: { label:"異常損失", icon:"⚠" },
+visualdash: { label:"視覺化儀表板", icon:"📊" },
+sitemap: { label:"工地地圖", icon:"🗺" },
+suppliers: { label:"廠商管理", icon:"🏢" },
+checklist: { label:"標準工程清單", icon:"📋" },
+paymenttrack: { label:"收款追蹤", icon:"💳" },
 settings: { label:"系統設定", icon:"⚙" },
 };
+const DEFAULT_LOCKED_PAGES = ["clients","ledger","purchase","expense","payroll","monthly","losses","settings"];
+// PROTECTED_PAGES 現在由使用者在系統設定中自訂；此處保留作為向下相容的預設值參考
+const PROTECTED_PAGES = Object.fromEntries(DEFAULT_LOCKED_PAGES.map(id=>[id, ALL_LOCKABLE_PAGES[id]]));
 
 function LockScreen({ pageId, onUnlock, onCancel, savedPassword }) {
 const [input, setInput] = useState("");
 const [error, setError] = useState(false);
 const [showPw, setShowPw] = useState(false);
-const page = PROTECTED_PAGES[pageId];
+const page = ALL_LOCKABLE_PAGES[pageId];
 
 const tryUnlock = () => {
 const pw = savedPassword || "1234";
@@ -4350,6 +4403,7 @@ autoFocus/>
 
 export default function App() {
 const [hiddenPages, setHiddenPages] = useLocalStorage("hiddenPages", []);
+const [lockedPages, setLockedPages] = useLocalStorage("lockedPages", DEFAULT_LOCKED_PAGES);
 const [currentRole, setCurrentRole] = useState(() => {
 try { return sessionStorage.getItem("currentRole") || null; } catch { return null; }
 });
@@ -4484,7 +4538,7 @@ case "materials": return (<Materials items={materials} setItems={setMaterials}/>
 case "inventory": return (<Inventory items={inventory} setItems={setInventory}/>);
 case "tracking": return (<Tracking items={tracking} setItems={setTracking} projects={projects}/>);
 case "losses": return (<Losses items={losses} setItems={setLosses} projects={projects}/>);
-case "settings": return (<Settings onClearAll={clearAll} rolePasswords={rolePasswords} setRolePasswords={setRolePasswords} customRoles={customRoles} setCustomRoles={setCustomRoles} hiddenPages={hiddenPages} setHiddenPages={setHiddenPages} companyInfo={companyInfo} setCompanyInfo={setCompanyInfo} notifSettings={notifSettings} setNotifSettings={setNotifSettings} menuCustom={menuCustom} setMenuCustom={setMenuCustom} appPassword={appPassword} setAppPassword={setAppPassword}/>);
+case "settings": return (<Settings onClearAll={clearAll} rolePasswords={rolePasswords} setRolePasswords={setRolePasswords} customRoles={customRoles} setCustomRoles={setCustomRoles} hiddenPages={hiddenPages} setHiddenPages={setHiddenPages} companyInfo={companyInfo} setCompanyInfo={setCompanyInfo} notifSettings={notifSettings} setNotifSettings={setNotifSettings} menuCustom={menuCustom} setMenuCustom={setMenuCustom} appPassword={appPassword} setAppPassword={setAppPassword} lockedPages={lockedPages} setLockedPages={setLockedPages}/>);
 default: return (<div className="text-center text-stone-400 py-16 text-sm">🔧 功能開發中</div>);
 }
 };
@@ -4554,11 +4608,11 @@ return(
 <div key={si} className="mb-2">
 {section.label!=="DASHBOARD"&&<div className="px-5 pt-4 pb-1 text-xs text-stone-400 tracking-wider">{section.label}</div>}
 {section.items.map(item=>(
-<button key={item.id} onClick={()=>{ const isProtected = Object.keys(PROTECTED_PAGES).includes(item.id) && !unlockedPages.includes(item.id); if(isProtected){setPendingPageId(item.id);setSidebarOpen(false);}else{setActiveId(item.id);setSidebarOpen(false);}; }}
+<button key={item.id} onClick={()=>{ const isProtected = lockedPages.includes(item.id) && !unlockedPages.includes(item.id); if(isProtected){setPendingPageId(item.id);setSidebarOpen(false);}else{setActiveId(item.id);setSidebarOpen(false);}; }}
 className={"w-full flex items-center gap-3 px-5 py-3 text-sm text-left "+(activeId===item.id?"bg-stone-100 font-semibold text-stone-900 rounded-xl mx-2 px-3":"text-stone-600 hover:bg-stone-50")}>
 <span>{(menuCustom[item.id]?.icon!==undefined?menuCustom[item.id].icon:item.icon)}</span>
 <span>{(menuCustom[item.id]?.label!==undefined?menuCustom[item.id].label:item.label)}</span>
-{Object.keys(PROTECTED_PAGES).includes(item.id)&&!unlockedPages.includes(item.id)&&<span className="ml-auto text-stone-300 text-xs">🔒</span>}
+{lockedPages.includes(item.id)&&!unlockedPages.includes(item.id)&&<span className="ml-auto text-stone-300 text-xs">🔒</span>}
 </button>
 ))}
 </div>
@@ -4581,7 +4635,7 @@ className={"w-full flex items-center gap-3 px-5 py-3 text-sm text-left "+(active
 const customIcon = menuCustom[tab.id]?.icon !== undefined ? menuCustom[tab.id].icon : tab.icon;
 const customLabel = menuCustom[tab.id]?.label !== undefined ? menuCustom[tab.id].label.slice(0,4) : tab.label;
 const isActive = activeId===tab.id;
-const handleTab = ()=>{ const p=Object.keys(PROTECTED_PAGES).includes(tab.id)&&!unlockedPages.includes(tab.id); if(p)setPendingPageId(tab.id); else setActiveId(tab.id); };
+const handleTab = ()=>{ const p=lockedPages.includes(tab.id)&&!unlockedPages.includes(tab.id); if(p)setPendingPageId(tab.id); else setActiveId(tab.id); };
 return (
 <button key={tab.id} onClick={handleTab} className={"flex flex-col items-center gap-0.5 px-4 py-1 "+(isActive?"text-stone-900":"text-stone-400")}>
 <span className="text-lg">{customIcon}</span>
